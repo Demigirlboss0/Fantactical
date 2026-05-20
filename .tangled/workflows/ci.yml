@@ -15,7 +15,7 @@ dependencies:
     - udev
     - libxkbcommon
     - vulkan-loader
-    - wayland.dev
+    - wayland
 
 steps:
   - name: "Install Rust stable"
@@ -27,10 +27,16 @@ steps:
     command: cargo fmt --check
 
   - name: "Clippy lint"
-    command: cargo clippy -- -D warnings
+    command: |
+      export PKG_CONFIG_PATH="$(find /nix/store -name 'wayland-client.pc' -printf '%h\n' -quit 2>/dev/null):$PKG_CONFIG_PATH"
+      cargo clippy -- -D warnings
 
   - name: "Run unit tests"
-    command: cargo test --lib
+    command: |
+      export PKG_CONFIG_PATH="$(find /nix/store -name 'wayland-client.pc' -printf '%h\n' -quit 2>/dev/null):$PKG_CONFIG_PATH"
+      cargo test --lib
 
   - name: "Run integration tests"
-    command: cargo test --test network_integration
+    command: |
+      export PKG_CONFIG_PATH="$(find /nix/store -name 'wayland-client.pc' -printf '%h\n' -quit 2>/dev/null):$PKG_CONFIG_PATH"
+      cargo test --test network_integration
