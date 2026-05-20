@@ -92,6 +92,7 @@ pub enum ServerMessage {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::GameState;
     use crate::model::{
         Actor, Encumbrance, ExtraEffort, LegState, LogEntry, LogEntryKind, ManeuverType,
         PainThreshold, Posture, StatusFlags, TurnPhase,
