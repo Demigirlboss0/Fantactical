@@ -15,6 +15,7 @@ dependencies:
     - udev
     - libxkbcommon
     - vulkan-loader
+    - wayland
 
 steps:
   - name: "Install Rust stable"
