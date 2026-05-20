@@ -32,7 +32,7 @@ steps:
 
   - name: "Clippy lint"
     command: |
-      WAYLAND_LIB=$(find /nix/store -maxdepth 3 -name 'libwayland-client.so' -printf '%h' -quit 2>/dev/null)
+      WAYLAND_LIB=$(find /nix/store -maxdepth 5 -name 'libwayland-client.so' -printf '%h' -quit 2>/dev/null)
       cat > /tmp/wayland-client.pc << PCEOF
       prefix=/usr
       libdir=${WAYLAND_LIB:-/nix/store/phony}
@@ -48,7 +48,7 @@ steps:
 
   - name: "Run unit tests"
     command: |
-      WAYLAND_LIB=$(find /nix/store -maxdepth 3 -name 'libwayland-client.so' -printf '%h' -quit 2>/dev/null)
+      WAYLAND_LIB=$(find /nix/store -maxdepth 5 -name 'libwayland-client.so' -printf '%h' -quit 2>/dev/null)
       cat > /tmp/wayland-client.pc << PCEOF
       prefix=/usr
       libdir=${WAYLAND_LIB:-/nix/store/phony}
@@ -64,7 +64,7 @@ steps:
 
   - name: "Run integration tests"
     command: |
-      WAYLAND_LIB=$(find /nix/store -maxdepth 3 -name 'libwayland-client.so' -printf '%h' -quit 2>/dev/null)
+      WAYLAND_LIB=$(find /nix/store -maxdepth 5 -name 'libwayland-client.so' -printf '%h' -quit 2>/dev/null)
       cat > /tmp/wayland-client.pc << PCEOF
       prefix=/usr
       libdir=${WAYLAND_LIB:-/nix/store/phony}
