@@ -32,45 +32,48 @@ steps:
 
   - name: "Clippy lint"
     command: |
-      cat > /tmp/wayland-client.pc << 'PCEOF'
+      WAYLAND_LIB=$(find /nix/store -maxdepth 3 -name 'libwayland-client.so' -printf '%h' -quit 2>/dev/null)
+      cat > /tmp/wayland-client.pc << PCEOF
       prefix=/usr
-      libdir=/nix/store/phony
+      libdir=${WAYLAND_LIB:-/nix/store/phony}
       includedir=/nix/store/phony
       Name: wayland-client
       Description: Wayland client library (stub for CI)
       Version: 1.22.0
-      Libs: -L${libdir} -lwayland-client
-      Cflags: -I${includedir}
+      Libs: -L\${libdir} -lwayland-client
+      Cflags: -I\${includedir}
       PCEOF
       export PKG_CONFIG_PATH=/tmp:$PKG_CONFIG_PATH
       cargo clippy -- -D warnings
 
   - name: "Run unit tests"
     command: |
-      cat > /tmp/wayland-client.pc << 'PCEOF'
+      WAYLAND_LIB=$(find /nix/store -maxdepth 3 -name 'libwayland-client.so' -printf '%h' -quit 2>/dev/null)
+      cat > /tmp/wayland-client.pc << PCEOF
       prefix=/usr
-      libdir=/nix/store/phony
+      libdir=${WAYLAND_LIB:-/nix/store/phony}
       includedir=/nix/store/phony
       Name: wayland-client
       Description: Wayland client library (stub for CI)
       Version: 1.22.0
-      Libs: -L${libdir} -lwayland-client
-      Cflags: -I${includedir}
+      Libs: -L\${libdir} -lwayland-client
+      Cflags: -I\${includedir}
       PCEOF
       export PKG_CONFIG_PATH=/tmp:$PKG_CONFIG_PATH
       cargo test --lib
 
   - name: "Run integration tests"
     command: |
-      cat > /tmp/wayland-client.pc << 'PCEOF'
+      WAYLAND_LIB=$(find /nix/store -maxdepth 3 -name 'libwayland-client.so' -printf '%h' -quit 2>/dev/null)
+      cat > /tmp/wayland-client.pc << PCEOF
       prefix=/usr
-      libdir=/nix/store/phony
+      libdir=${WAYLAND_LIB:-/nix/store/phony}
       includedir=/nix/store/phony
       Name: wayland-client
       Description: Wayland client library (stub for CI)
       Version: 1.22.0
-      Libs: -L${libdir} -lwayland-client
-      Cflags: -I${includedir}
+      Libs: -L\${libdir} -lwayland-client
+      Cflags: -I\${includedir}
       PCEOF
       export PKG_CONFIG_PATH=/tmp:$PKG_CONFIG_PATH
       cargo test --test network_integration
