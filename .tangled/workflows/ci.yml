@@ -13,7 +13,6 @@ dependencies:
     - binutils
     - pkg-config
     - udev
-    - alsa-lib
     - libxkbcommon
     - vulkan-loader
 
