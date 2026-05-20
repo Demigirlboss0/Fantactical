@@ -6,6 +6,10 @@ This document is the canonical reference for all agents working on this codebase
 Read it in full before writing any code. Do not begin rendering or UI work until
 the data model crate has been reviewed and signed off.
 
+**Remotes:** Always push to both remotes after committing:
+- `origin` = `git@tangled.org:did:plc:pnk4t5vzhhdhged57pgl27pv`
+- `github` = `git@github.com:Demigirlboss0/Fantactical.git`
+
 ---
 
 ## Project Overview
