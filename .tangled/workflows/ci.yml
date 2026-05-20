@@ -9,6 +9,8 @@ engine: "nixery"
 dependencies:
   nixpkgs:
     - rustup
+    - gcc
+    - binutils
     - pkg-config
     - udev
     - alsa-lib
