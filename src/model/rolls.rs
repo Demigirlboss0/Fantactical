@@ -1,6 +1,6 @@
 use super::*;
-use rand::{Rng, SeedableRng};
 use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 use std::cell::RefCell;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -103,8 +103,8 @@ pub fn crit_hit_table(roll: u8) -> CritHitResult {
     // in the phase machine (see modifies_damage).
     match roll {
         3 => CritHitResult::TripleDamage,
-        4 => CritHitResult::IgnoreDR,    // B556: double dmg + ignore DR
-        5 => CritHitResult::HalveDR,     // B556: double dmg + halve DR
+        4 => CritHitResult::IgnoreDR, // B556: double dmg + ignore DR
+        5 => CritHitResult::HalveDR,  // B556: double dmg + halve DR
         6 => CritHitResult::MaxDamage,
         7 => CritHitResult::MajorWoundAutomatic,
         8 => CritHitResult::StunAutomatic,
@@ -200,7 +200,7 @@ mod tests {
         let result16 = check_roll(17, 16);
         // roll 17 > skill 16 → Failure
         assert_eq!(result16, RollOutcome::Failure);
-        // roll 17 <= skill 20 → Success  
+        // roll 17 <= skill 20 → Success
         assert_eq!(check_roll(17, 20), RollOutcome::Success);
     }
 

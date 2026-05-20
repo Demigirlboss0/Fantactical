@@ -1,20 +1,12 @@
+use crate::model::{AppSettings, MilSimTheme, Srgba, Theme, ThemeColors, ThemeTypography};
 use bevy::prelude::*;
-use crate::model::{AppSettings, MilSimTheme, ThemeColors, ThemeTypography, Theme, Srgba};
 use std::path::Path;
 
 const SETTINGS_FILENAME: &str = "fantactical_settings.json";
 
-#[derive(Resource, Debug, Clone)]
+#[derive(Resource, Debug, Clone, Default)]
 pub struct SettingsResource {
     pub settings: AppSettings,
-}
-
-impl Default for SettingsResource {
-    fn default() -> Self {
-        Self {
-            settings: AppSettings::default(),
-        }
-    }
 }
 
 pub fn load_settings() -> AppSettings {

@@ -57,11 +57,7 @@ pub fn resolve_injury(
     };
     let (final_damage, is_max_damage) = apply_crit_damage_modifier(rolled_damage, crit_result);
 
-    let penetrating = if final_damage > effective_dr as u32 {
-        final_damage - effective_dr as u32
-    } else {
-        0
-    };
+    let penetrating = final_damage.saturating_sub(effective_dr as u32);
 
     let raw_injury = if is_max_damage {
         penetrating
@@ -122,8 +118,7 @@ pub fn resolve_injury(
         modified.flags.dead = true;
     }
 
-    let (consciousness_roll_needed, consciousness_penalty) =
-        check_consciousness(&modified, hp_max);
+    let (consciousness_roll_needed, consciousness_penalty) = check_consciousness(&modified, hp_max);
 
     let mut new_state = state.clone();
     new_state.actors.insert(target_id, modified);
@@ -151,7 +146,11 @@ pub fn resolve_injury(
     Ok((new_state, outcome))
 }
 
-fn calculate_dr(target: &Actor, hit_location: HitLocation, crit_result: Option<CritHitResult>) -> u8 {
+fn calculate_dr(
+    target: &Actor,
+    hit_location: HitLocation,
+    crit_result: Option<CritHitResult>,
+) -> u8 {
     if let Some(cr) = crit_result {
         if cr.ignore_dr() {
             return 0;
@@ -206,10 +205,7 @@ fn determine_knockdown(
 
     let mut modifier: i8 = 0;
 
-    let knockout_from_crit = matches!(
-        crit_result,
-        Some(CritHitResult::MajorWoundAutomatic)
-    );
+    let knockout_from_crit = matches!(crit_result, Some(CritHitResult::MajorWoundAutomatic));
 
     if !major_wound && !knockout_from_crit {
         return (false, false, 0);
@@ -292,9 +288,7 @@ fn check_consciousness(actor: &Actor, hp_max: i16) -> (bool, i8) {
         return (false, 0);
     }
 
-    let penalty = if actor.hp_current <= -4 * hp_max {
-        -3
-    } else if actor.hp_current <= -3 * hp_max {
+    let penalty = if actor.hp_current <= -3 * hp_max {
         -3
     } else if actor.hp_current <= -2 * hp_max {
         -2
@@ -827,7 +821,10 @@ mod tests {
         assert_eq!(outcome.shock_penalty, -4);
         let updated = new_state.actors.get(&2).unwrap();
         assert!(
-            updated.individual_modifiers.iter().any(|m| m.label == "Shock (-4)"),
+            updated
+                .individual_modifiers
+                .iter()
+                .any(|m| m.label == "Shock (-4)"),
             "Shock modifier should be pushed to actor's individual_modifiers"
         );
     }
@@ -852,4 +849,3 @@ mod tests {
         assert!(!outcome.consciousness_roll_needed);
     }
 }
-

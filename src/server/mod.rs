@@ -1,3 +1,4 @@
+use futures_util::{SinkExt, StreamExt};
 use log;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -5,7 +6,6 @@ use tokio::net::TcpListener;
 use tokio::sync::{mpsc, Mutex};
 use tokio_tungstenite::accept_async;
 use tokio_tungstenite::tungstenite::Message;
-use futures_util::{SinkExt, StreamExt}; 
 
 use crate::network::{ClientMessage, ServerMessage, DEFAULT_PORT};
 
@@ -48,22 +48,32 @@ struct ServerState {
 pub enum ServerOutgoing {
     Broadcast(ServerMessage),
     SendTo(ClientId, ServerMessage),
-    SetActorOwnership { client_id: ClientId, actor_ids: Vec<crate::model::ActorId> },
+    SetActorOwnership {
+        client_id: ClientId,
+        actor_ids: Vec<crate::model::ActorId>,
+    },
 }
 
 /// Channel for server → Bevy messages (incoming from clients)
 #[derive(Debug, Clone)]
 pub enum ServerIncoming {
-    ClientConnected { client_id: ClientId, is_gm: bool },
-    ClientDisconnected { client_id: ClientId },
-    Message { client_id: ClientId, message: ClientMessage },
+    ClientConnected {
+        client_id: ClientId,
+        is_gm: bool,
+    },
+    ClientDisconnected {
+        client_id: ClientId,
+    },
+    Message {
+        client_id: ClientId,
+        message: ClientMessage,
+    },
 }
 
 /// Spawn the WebSocket server in a background tokio task.
 /// Returns channels for communicating with the Bevy app.
 pub fn spawn_server(
-    #[allow(dead_code)]
-    config: ServerConfig,
+    #[allow(dead_code)] config: ServerConfig,
 ) -> (
     mpsc::UnboundedSender<ServerOutgoing>,
     mpsc::UnboundedReceiver<ServerIncoming>,
@@ -159,39 +169,37 @@ async fn handle_connection(
 
     // --- Authentication handshake ---
     // Read the first message; it must be a valid Auth message
-    let (client_id, is_gm, client_tx, mut client_rx) = {
+    let (client_id, is_gm, _client_tx, mut client_rx) = {
         let valid_token = {
             let guard = state.lock().await;
             guard.config.session_token.clone()
         };
 
         match ws_receiver.next().await {
-            Some(Ok(Message::Text(text))) => {
-                match serde_json::from_str::<ClientMessage>(&text) {
-                    Ok(ClientMessage::Auth { token }) => {
-                        if token != valid_token {
-                            let fail = ServerMessage::AuthFailure {
-                                reason: "Invalid session token".into()
-                            };
-                            if let Ok(json) = serde_json::to_string(&fail) {
-                                let _ = ws_sender.send(Message::Text(json)).await;
-                            }
-                            log::warn!("Client rejected: bad token");
-                            return;
-                        }
-                    }
-                    _ => {
+            Some(Ok(Message::Text(text))) => match serde_json::from_str::<ClientMessage>(&text) {
+                Ok(ClientMessage::Auth { token }) => {
+                    if token != valid_token {
                         let fail = ServerMessage::AuthFailure {
-                            reason: "Expected Auth message".into()
+                            reason: "Invalid session token".into(),
                         };
                         if let Ok(json) = serde_json::to_string(&fail) {
                             let _ = ws_sender.send(Message::Text(json)).await;
                         }
-                        log::warn!("Client rejected: no Auth message");
+                        log::warn!("Client rejected: bad token");
                         return;
                     }
                 }
-            }
+                _ => {
+                    let fail = ServerMessage::AuthFailure {
+                        reason: "Expected Auth message".into(),
+                    };
+                    if let Ok(json) = serde_json::to_string(&fail) {
+                        let _ = ws_sender.send(Message::Text(json)).await;
+                    }
+                    log::warn!("Client rejected: no Auth message");
+                    return;
+                }
+            },
             _ => {
                 log::warn!("Client disconnected before auth");
                 return;
@@ -203,19 +211,24 @@ async fn handle_connection(
         guard.next_client_id += 1;
         let gm = guard.clients.is_empty(); // first client is GM
         let (tx, rx) = mpsc::unbounded_channel::<Message>();
-        guard.clients.insert(cid, ClientState {
-            client_id: cid,
-            is_gm: gm,
-            sender: tx.clone(),
-            assigned_actors: Vec::new(),
-        });
+        guard.clients.insert(
+            cid,
+            ClientState {
+                client_id: cid,
+                is_gm: gm,
+                sender: tx.clone(),
+                assigned_actors: Vec::new(),
+            },
+        );
         (cid, gm, tx, rx)
     };
 
     let _ = incoming.send(ServerIncoming::ClientConnected { client_id, is_gm });
     let _ = incoming.send(ServerIncoming::Message {
         client_id,
-        message: ClientMessage::Auth { token: String::new() },
+        message: ClientMessage::Auth {
+            token: String::new(),
+        },
     });
 
     // Send auth success AFTER validation
@@ -296,7 +309,9 @@ mod tests {
         let (outgoing_tx, _incoming_rx) = spawn_server(config);
         // Verify channels work by sending a message
         let result = outgoing_tx.send(ServerOutgoing::Broadcast(
-            crate::network::ServerMessage::Error { message: "test".into() }
+            crate::network::ServerMessage::Error {
+                message: "test".into(),
+            },
         ));
         assert!(result.is_ok());
     }

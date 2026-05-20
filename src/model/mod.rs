@@ -2,10 +2,10 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-pub mod maneuver_legality;
-pub mod injury;
-pub mod rolls;
 pub mod gcs_import;
+pub mod injury;
+pub mod maneuver_legality;
+pub mod rolls;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CritHitResult {
@@ -54,8 +54,9 @@ pub struct Srgba {
 // Hit Locations — full extended humanoid table (B552)
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum HitLocation {
+    #[default]
     Torso,
     Skull,
     Face,
@@ -83,12 +84,6 @@ pub enum HitLocation {
     NeckVascular,
     ArmLegJoint,
     HandFootJoint,
-}
-
-impl Default for HitLocation {
-    fn default() -> Self {
-        Self::Torso
-    }
 }
 
 impl HitLocation {
@@ -129,14 +124,17 @@ impl HitLocation {
     }
 
     pub fn is_head_location(&self) -> bool {
-        matches!(self, Self::Skull | Self::Face | Self::Eye | Self::Ear | Self::Nose | Self::Jaw)
+        matches!(
+            self,
+            Self::Skull | Self::Face | Self::Eye | Self::Ear | Self::Nose | Self::Jaw
+        )
     }
 
     pub fn from_random_roll(roll: u8) -> (Self, i8) {
         match roll {
             3 | 4 => (Self::Torso, 0),
             5 | 6 => (Self::RightArm, -2),
-            7 | 8 | 9 | 10 => (Self::Torso, 0),
+            7..=10 => (Self::Torso, 0),
             11 => (Self::Groin, -3),
             12 | 13 => (Self::RightArm, -2),
             14 | 15 => (Self::RightLeg, -2),
@@ -171,85 +169,106 @@ impl HitLocation {
 
     pub fn iter_all() -> impl Iterator<Item = HitLocation> {
         [
-            Self::Torso, Self::Skull, Self::Face, Self::Neck, Self::Vitals, Self::Groin,
-            Self::RightArm, Self::LeftArm, Self::RightHand, Self::LeftHand,
-            Self::RightLeg, Self::LeftLeg, Self::RightFoot, Self::LeftFoot,
-            Self::Eye, Self::Ear, Self::Nose, Self::Jaw,
-            Self::Abdomen, Self::Pelvis, Self::Spine, Self::DigestiveTract, Self::Heart,
-            Self::LimbVascular, Self::NeckVascular,
-            Self::ArmLegJoint, Self::HandFootJoint,
-        ].into_iter()
+            Self::Torso,
+            Self::Skull,
+            Self::Face,
+            Self::Neck,
+            Self::Vitals,
+            Self::Groin,
+            Self::RightArm,
+            Self::LeftArm,
+            Self::RightHand,
+            Self::LeftHand,
+            Self::RightLeg,
+            Self::LeftLeg,
+            Self::RightFoot,
+            Self::LeftFoot,
+            Self::Eye,
+            Self::Ear,
+            Self::Nose,
+            Self::Jaw,
+            Self::Abdomen,
+            Self::Pelvis,
+            Self::Spine,
+            Self::DigestiveTract,
+            Self::Heart,
+            Self::LimbVascular,
+            Self::NeckVascular,
+            Self::ArmLegJoint,
+            Self::HandFootJoint,
+        ]
+        .into_iter()
     }
 
     pub fn is_legal_target(&self, damage_type: DamageType) -> bool {
         match (self, damage_type) {
-                (Self::Eye, DamageType::Impaling)
-                | (Self::Eye, DamageType::Piercing)
-                | (Self::Eye, DamageType::SmallPiercing)
-                | (Self::Eye, DamageType::LargePiercing)
-                | (Self::Eye, DamageType::HugePiercing)
-                | (Self::Eye, DamageType::TightBeamBurning) => true,
-                (Self::Eye, _) => false,
+            (Self::Eye, DamageType::Impaling)
+            | (Self::Eye, DamageType::Piercing)
+            | (Self::Eye, DamageType::SmallPiercing)
+            | (Self::Eye, DamageType::LargePiercing)
+            | (Self::Eye, DamageType::HugePiercing)
+            | (Self::Eye, DamageType::TightBeamBurning) => true,
+            (Self::Eye, _) => false,
 
-                (Self::Vitals, DamageType::Cutting)
-                | (Self::Vitals, DamageType::Impaling)
-                | (Self::Vitals, DamageType::Piercing)
-                | (Self::Vitals, DamageType::SmallPiercing)
-                | (Self::Vitals, DamageType::LargePiercing)
-                | (Self::Vitals, DamageType::HugePiercing)
-                | (Self::Vitals, DamageType::TightBeamBurning) => true,
-                (Self::Vitals, _) => false,
+            (Self::Vitals, DamageType::Cutting)
+            | (Self::Vitals, DamageType::Impaling)
+            | (Self::Vitals, DamageType::Piercing)
+            | (Self::Vitals, DamageType::SmallPiercing)
+            | (Self::Vitals, DamageType::LargePiercing)
+            | (Self::Vitals, DamageType::HugePiercing)
+            | (Self::Vitals, DamageType::TightBeamBurning) => true,
+            (Self::Vitals, _) => false,
 
-                (Self::LimbVascular, DamageType::Cutting)
-                | (Self::LimbVascular, DamageType::Impaling)
-                | (Self::LimbVascular, DamageType::Piercing)
-                | (Self::LimbVascular, DamageType::SmallPiercing)
-                | (Self::LimbVascular, DamageType::LargePiercing)
-                | (Self::LimbVascular, DamageType::HugePiercing)
-                | (Self::LimbVascular, DamageType::TightBeamBurning) => true,
-                (Self::LimbVascular, _) => false,
+            (Self::LimbVascular, DamageType::Cutting)
+            | (Self::LimbVascular, DamageType::Impaling)
+            | (Self::LimbVascular, DamageType::Piercing)
+            | (Self::LimbVascular, DamageType::SmallPiercing)
+            | (Self::LimbVascular, DamageType::LargePiercing)
+            | (Self::LimbVascular, DamageType::HugePiercing)
+            | (Self::LimbVascular, DamageType::TightBeamBurning) => true,
+            (Self::LimbVascular, _) => false,
 
-                (Self::NeckVascular, DamageType::Cutting)
-                | (Self::NeckVascular, DamageType::Impaling)
-                | (Self::NeckVascular, DamageType::Piercing)
-                | (Self::NeckVascular, DamageType::SmallPiercing)
-                | (Self::NeckVascular, DamageType::LargePiercing)
-                | (Self::NeckVascular, DamageType::HugePiercing)
-                | (Self::NeckVascular, DamageType::TightBeamBurning) => true,
-                (Self::NeckVascular, _) => false,
+            (Self::NeckVascular, DamageType::Cutting)
+            | (Self::NeckVascular, DamageType::Impaling)
+            | (Self::NeckVascular, DamageType::Piercing)
+            | (Self::NeckVascular, DamageType::SmallPiercing)
+            | (Self::NeckVascular, DamageType::LargePiercing)
+            | (Self::NeckVascular, DamageType::HugePiercing)
+            | (Self::NeckVascular, DamageType::TightBeamBurning) => true,
+            (Self::NeckVascular, _) => false,
 
-                (Self::Heart, DamageType::Cutting)
-                | (Self::Heart, DamageType::Impaling)
-                | (Self::Heart, DamageType::Piercing)
-                | (Self::Heart, DamageType::SmallPiercing)
-                | (Self::Heart, DamageType::LargePiercing)
-                | (Self::Heart, DamageType::HugePiercing)
-                | (Self::Heart, DamageType::TightBeamBurning) => true,
-                (Self::Heart, _) => false,
+            (Self::Heart, DamageType::Cutting)
+            | (Self::Heart, DamageType::Impaling)
+            | (Self::Heart, DamageType::Piercing)
+            | (Self::Heart, DamageType::SmallPiercing)
+            | (Self::Heart, DamageType::LargePiercing)
+            | (Self::Heart, DamageType::HugePiercing)
+            | (Self::Heart, DamageType::TightBeamBurning) => true,
+            (Self::Heart, _) => false,
 
-                (Self::Spine, DamageType::Cutting)
-                | (Self::Spine, DamageType::Impaling)
-                | (Self::Spine, DamageType::Piercing)
-                | (Self::Spine, DamageType::SmallPiercing)
-                | (Self::Spine, DamageType::LargePiercing)
-                | (Self::Spine, DamageType::HugePiercing)
-                | (Self::Spine, DamageType::TightBeamBurning) => true,
-                (Self::Spine, _) => false,
+            (Self::Spine, DamageType::Cutting)
+            | (Self::Spine, DamageType::Impaling)
+            | (Self::Spine, DamageType::Piercing)
+            | (Self::Spine, DamageType::SmallPiercing)
+            | (Self::Spine, DamageType::LargePiercing)
+            | (Self::Spine, DamageType::HugePiercing)
+            | (Self::Spine, DamageType::TightBeamBurning) => true,
+            (Self::Spine, _) => false,
 
-                (Self::ArmLegJoint, DamageType::Crushing)
-                | (Self::ArmLegJoint, DamageType::Impaling)
-                | (Self::ArmLegJoint, DamageType::Piercing)
-                | (Self::ArmLegJoint, DamageType::TightBeamBurning) => true,
-                (Self::ArmLegJoint, _) => false,
+            (Self::ArmLegJoint, DamageType::Crushing)
+            | (Self::ArmLegJoint, DamageType::Impaling)
+            | (Self::ArmLegJoint, DamageType::Piercing)
+            | (Self::ArmLegJoint, DamageType::TightBeamBurning) => true,
+            (Self::ArmLegJoint, _) => false,
 
-                (Self::HandFootJoint, DamageType::Crushing)
-                | (Self::HandFootJoint, DamageType::Impaling)
-                | (Self::HandFootJoint, DamageType::Piercing)
-                | (Self::HandFootJoint, DamageType::TightBeamBurning) => true,
-                (Self::HandFootJoint, _) => false,
+            (Self::HandFootJoint, DamageType::Crushing)
+            | (Self::HandFootJoint, DamageType::Impaling)
+            | (Self::HandFootJoint, DamageType::Piercing)
+            | (Self::HandFootJoint, DamageType::TightBeamBurning) => true,
+            (Self::HandFootJoint, _) => false,
 
-                _ => true,
-            }
+            _ => true,
+        }
     }
 
     pub fn wounding_multiplier(&self, damage_type: DamageType) -> f32 {
@@ -408,25 +427,13 @@ pub enum PainThreshold {
 // Actor sub-types
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct StatusFlags {
     pub stunned: bool,
     pub stun_turns: u8,
     pub knocked_down: bool,
     pub unconscious: bool,
     pub dead: bool,
-}
-
-impl Default for StatusFlags {
-    fn default() -> Self {
-        Self {
-            stunned: false,
-            stun_turns: 0,
-            knocked_down: false,
-            unconscious: false,
-            dead: false,
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -875,23 +882,26 @@ pub fn range_penalty(yards: f32) -> i8 {
 pub fn hex_distance(a: (i32, i32), b: (i32, i32)) -> u32 {
     let dq = (a.0 - b.0).unsigned_abs();
     let dr = (a.1 - b.1).unsigned_abs();
-    dq.max(dr).max((a.0 + a.1 - b.0 - b.1).unsigned_abs()) as u32
+    dq.max(dr).max((a.0 + a.1 - b.0 - b.1).unsigned_abs())
 }
 
 /// Sort turn order by initiative priority:
 /// 1. ETS actors first (among themselves, sort by Basic Speed desc, then DX desc)
 /// 2. Remaining actors by Basic Speed desc
 /// 3. Ties broken by DX desc
-pub fn sort_turn_order(actors: &HashMap<ActorId, Actor>, turn_order: &mut Vec<ActorId>) {
+pub fn sort_turn_order(actors: &HashMap<ActorId, Actor>, turn_order: &mut [ActorId]) {
     turn_order.sort_by(|a, b| {
         let a_actor = actors.get(a);
         let b_actor = actors.get(b);
         match (a_actor, b_actor) {
             (Some(a_actor), Some(b_actor)) => {
                 if a_actor.enhanced_time_sense != b_actor.enhanced_time_sense {
-                    b_actor.enhanced_time_sense.cmp(&a_actor.enhanced_time_sense)
+                    b_actor
+                        .enhanced_time_sense
+                        .cmp(&a_actor.enhanced_time_sense)
                 } else {
-                    b_actor.basic_speed
+                    b_actor
+                        .basic_speed
                         .partial_cmp(&a_actor.basic_speed)
                         .unwrap_or(std::cmp::Ordering::Equal)
                         .then(b_actor.dx.cmp(&a_actor.dx))
@@ -1183,33 +1193,54 @@ mod tests {
 
     #[test]
     fn test_vitals_tox_wounding() {
-        assert_eq!(HitLocation::Vitals.wounding_multiplier(DamageType::Toxic), 1.0);
-        assert_eq!(HitLocation::Skull.wounding_multiplier(DamageType::Toxic), 1.0);
+        assert_eq!(
+            HitLocation::Vitals.wounding_multiplier(DamageType::Toxic),
+            1.0
+        );
+        assert_eq!(
+            HitLocation::Skull.wounding_multiplier(DamageType::Toxic),
+            1.0
+        );
     }
 
     #[test]
     fn test_skull_impaling_wounding() {
-        assert_eq!(HitLocation::Skull.wounding_multiplier(DamageType::Impaling), 4.0);
+        assert_eq!(
+            HitLocation::Skull.wounding_multiplier(DamageType::Impaling),
+            4.0
+        );
     }
 
     #[test]
     fn test_face_cr_wounding() {
-        assert_eq!(HitLocation::Face.wounding_multiplier(DamageType::Crushing), 1.5);
+        assert_eq!(
+            HitLocation::Face.wounding_multiplier(DamageType::Crushing),
+            1.5
+        );
     }
 
     #[test]
     fn test_neck_cut_wounding() {
-        assert_eq!(HitLocation::Neck.wounding_multiplier(DamageType::Cutting), 2.0);
+        assert_eq!(
+            HitLocation::Neck.wounding_multiplier(DamageType::Cutting),
+            2.0
+        );
     }
 
     #[test]
     fn test_face_corrosive_wounding() {
-        assert_eq!(HitLocation::Face.wounding_multiplier(DamageType::Corrosive), 1.5);
+        assert_eq!(
+            HitLocation::Face.wounding_multiplier(DamageType::Corrosive),
+            1.5
+        );
     }
 
     #[test]
     fn test_torso_corrosive_wounding() {
-        assert_eq!(HitLocation::Torso.wounding_multiplier(DamageType::Corrosive), 1.0);
+        assert_eq!(
+            HitLocation::Torso.wounding_multiplier(DamageType::Corrosive),
+            1.0
+        );
     }
 
     #[test]
@@ -1504,42 +1535,129 @@ mod tests {
     #[test]
     fn test_sort_turn_order_ets_first() {
         let mut actors = HashMap::new();
-        actors.insert(1, Actor {
-            id: 1, name: "Slow".into(), portrait_path: None, portrait_data: None, source_path: None,
-            is_npc: false, st: 10, dx: 10, iq: 10, ht: 10, hp_max: 10, fp_max: 10,
-            basic_speed: 5.0, basic_move: 5, will: 10, per: 10,
-            attacks: vec![], skills: vec![], armor: vec![], sm: 0, is_male: true,
-            position: (0, 0), hp_current: 10, fp_current: 10,
-            posture: Posture::Standing, encumbrance: Encumbrance::None,
-            flags: StatusFlags::default(), leg_state: LegState::default(),
-            individual_modifiers: vec![], pain_threshold: PainThreshold::Normal,
-            turns_per_round: 1, attacks_per_turn: 1, enhanced_time_sense: false,
-            current_maneuver: None, active_attack: None, extra_effort: vec![],
-        });
-        actors.insert(2, Actor {
-            id: 2, name: "Fast".into(), portrait_path: None, portrait_data: None, source_path: None,
-            is_npc: false, st: 10, dx: 12, iq: 10, ht: 10, hp_max: 10, fp_max: 10,
-            basic_speed: 7.0, basic_move: 7, will: 10, per: 10,
-            attacks: vec![], skills: vec![], armor: vec![], sm: 0, is_male: true,
-            position: (0, 0), hp_current: 10, fp_current: 10,
-            posture: Posture::Standing, encumbrance: Encumbrance::None,
-            flags: StatusFlags::default(), leg_state: LegState::default(),
-            individual_modifiers: vec![], pain_threshold: PainThreshold::Normal,
-            turns_per_round: 1, attacks_per_turn: 1, enhanced_time_sense: false,
-            current_maneuver: None, active_attack: None, extra_effort: vec![],
-        });
-        actors.insert(3, Actor {
-            id: 3, name: "ETS".into(), portrait_path: None, portrait_data: None, source_path: None,
-            is_npc: false, st: 10, dx: 9, iq: 10, ht: 10, hp_max: 10, fp_max: 10,
-            basic_speed: 4.0, basic_move: 4, will: 10, per: 10,
-            attacks: vec![], skills: vec![], armor: vec![], sm: 0, is_male: true,
-            position: (0, 0), hp_current: 10, fp_current: 10,
-            posture: Posture::Standing, encumbrance: Encumbrance::None,
-            flags: StatusFlags::default(), leg_state: LegState::default(),
-            individual_modifiers: vec![], pain_threshold: PainThreshold::Normal,
-            turns_per_round: 1, attacks_per_turn: 1, enhanced_time_sense: true,
-            current_maneuver: None, active_attack: None, extra_effort: vec![],
-        });
+        actors.insert(
+            1,
+            Actor {
+                id: 1,
+                name: "Slow".into(),
+                portrait_path: None,
+                portrait_data: None,
+                source_path: None,
+                is_npc: false,
+                st: 10,
+                dx: 10,
+                iq: 10,
+                ht: 10,
+                hp_max: 10,
+                fp_max: 10,
+                basic_speed: 5.0,
+                basic_move: 5,
+                will: 10,
+                per: 10,
+                attacks: vec![],
+                skills: vec![],
+                armor: vec![],
+                sm: 0,
+                is_male: true,
+                position: (0, 0),
+                hp_current: 10,
+                fp_current: 10,
+                posture: Posture::Standing,
+                encumbrance: Encumbrance::None,
+                flags: StatusFlags::default(),
+                leg_state: LegState::default(),
+                individual_modifiers: vec![],
+                pain_threshold: PainThreshold::Normal,
+                turns_per_round: 1,
+                attacks_per_turn: 1,
+                enhanced_time_sense: false,
+                current_maneuver: None,
+                active_attack: None,
+                extra_effort: vec![],
+            },
+        );
+        actors.insert(
+            2,
+            Actor {
+                id: 2,
+                name: "Fast".into(),
+                portrait_path: None,
+                portrait_data: None,
+                source_path: None,
+                is_npc: false,
+                st: 10,
+                dx: 12,
+                iq: 10,
+                ht: 10,
+                hp_max: 10,
+                fp_max: 10,
+                basic_speed: 7.0,
+                basic_move: 7,
+                will: 10,
+                per: 10,
+                attacks: vec![],
+                skills: vec![],
+                armor: vec![],
+                sm: 0,
+                is_male: true,
+                position: (0, 0),
+                hp_current: 10,
+                fp_current: 10,
+                posture: Posture::Standing,
+                encumbrance: Encumbrance::None,
+                flags: StatusFlags::default(),
+                leg_state: LegState::default(),
+                individual_modifiers: vec![],
+                pain_threshold: PainThreshold::Normal,
+                turns_per_round: 1,
+                attacks_per_turn: 1,
+                enhanced_time_sense: false,
+                current_maneuver: None,
+                active_attack: None,
+                extra_effort: vec![],
+            },
+        );
+        actors.insert(
+            3,
+            Actor {
+                id: 3,
+                name: "ETS".into(),
+                portrait_path: None,
+                portrait_data: None,
+                source_path: None,
+                is_npc: false,
+                st: 10,
+                dx: 9,
+                iq: 10,
+                ht: 10,
+                hp_max: 10,
+                fp_max: 10,
+                basic_speed: 4.0,
+                basic_move: 4,
+                will: 10,
+                per: 10,
+                attacks: vec![],
+                skills: vec![],
+                armor: vec![],
+                sm: 0,
+                is_male: true,
+                position: (0, 0),
+                hp_current: 10,
+                fp_current: 10,
+                posture: Posture::Standing,
+                encumbrance: Encumbrance::None,
+                flags: StatusFlags::default(),
+                leg_state: LegState::default(),
+                individual_modifiers: vec![],
+                pain_threshold: PainThreshold::Normal,
+                turns_per_round: 1,
+                attacks_per_turn: 1,
+                enhanced_time_sense: true,
+                current_maneuver: None,
+                active_attack: None,
+                extra_effort: vec![],
+            },
+        );
 
         let mut turn_order = vec![1, 2, 3];
         sort_turn_order(&actors, &mut turn_order);
@@ -1549,30 +1667,88 @@ mod tests {
     #[test]
     fn test_sort_turn_order_dx_tiebreaker() {
         let mut actors = HashMap::new();
-        actors.insert(1, Actor {
-            id: 1, name: "Equal Speed Low DX".into(), portrait_path: None, portrait_data: None, source_path: None,
-            is_npc: false, st: 10, dx: 10, iq: 10, ht: 10, hp_max: 10, fp_max: 10,
-            basic_speed: 6.0, basic_move: 6, will: 10, per: 10,
-            attacks: vec![], skills: vec![], armor: vec![], sm: 0, is_male: true,
-            position: (0, 0), hp_current: 10, fp_current: 10,
-            posture: Posture::Standing, encumbrance: Encumbrance::None,
-            flags: StatusFlags::default(), leg_state: LegState::default(),
-            individual_modifiers: vec![], pain_threshold: PainThreshold::Normal,
-            turns_per_round: 1, attacks_per_turn: 1, enhanced_time_sense: false,
-            current_maneuver: None, active_attack: None, extra_effort: vec![],
-        });
-        actors.insert(2, Actor {
-            id: 2, name: "Equal Speed High DX".into(), portrait_path: None, portrait_data: None, source_path: None,
-            is_npc: false, st: 10, dx: 14, iq: 10, ht: 10, hp_max: 10, fp_max: 10,
-            basic_speed: 6.0, basic_move: 6, will: 10, per: 10,
-            attacks: vec![], skills: vec![], armor: vec![], sm: 0, is_male: true,
-            position: (0, 0), hp_current: 10, fp_current: 10,
-            posture: Posture::Standing, encumbrance: Encumbrance::None,
-            flags: StatusFlags::default(), leg_state: LegState::default(),
-            individual_modifiers: vec![], pain_threshold: PainThreshold::Normal,
-            turns_per_round: 1, attacks_per_turn: 1, enhanced_time_sense: false,
-            current_maneuver: None, active_attack: None, extra_effort: vec![],
-        });
+        actors.insert(
+            1,
+            Actor {
+                id: 1,
+                name: "Equal Speed Low DX".into(),
+                portrait_path: None,
+                portrait_data: None,
+                source_path: None,
+                is_npc: false,
+                st: 10,
+                dx: 10,
+                iq: 10,
+                ht: 10,
+                hp_max: 10,
+                fp_max: 10,
+                basic_speed: 6.0,
+                basic_move: 6,
+                will: 10,
+                per: 10,
+                attacks: vec![],
+                skills: vec![],
+                armor: vec![],
+                sm: 0,
+                is_male: true,
+                position: (0, 0),
+                hp_current: 10,
+                fp_current: 10,
+                posture: Posture::Standing,
+                encumbrance: Encumbrance::None,
+                flags: StatusFlags::default(),
+                leg_state: LegState::default(),
+                individual_modifiers: vec![],
+                pain_threshold: PainThreshold::Normal,
+                turns_per_round: 1,
+                attacks_per_turn: 1,
+                enhanced_time_sense: false,
+                current_maneuver: None,
+                active_attack: None,
+                extra_effort: vec![],
+            },
+        );
+        actors.insert(
+            2,
+            Actor {
+                id: 2,
+                name: "Equal Speed High DX".into(),
+                portrait_path: None,
+                portrait_data: None,
+                source_path: None,
+                is_npc: false,
+                st: 10,
+                dx: 14,
+                iq: 10,
+                ht: 10,
+                hp_max: 10,
+                fp_max: 10,
+                basic_speed: 6.0,
+                basic_move: 6,
+                will: 10,
+                per: 10,
+                attacks: vec![],
+                skills: vec![],
+                armor: vec![],
+                sm: 0,
+                is_male: true,
+                position: (0, 0),
+                hp_current: 10,
+                fp_current: 10,
+                posture: Posture::Standing,
+                encumbrance: Encumbrance::None,
+                flags: StatusFlags::default(),
+                leg_state: LegState::default(),
+                individual_modifiers: vec![],
+                pain_threshold: PainThreshold::Normal,
+                turns_per_round: 1,
+                attacks_per_turn: 1,
+                enhanced_time_sense: false,
+                current_maneuver: None,
+                active_attack: None,
+                extra_effort: vec![],
+            },
+        );
 
         let mut turn_order = vec![1, 2];
         sort_turn_order(&actors, &mut turn_order);

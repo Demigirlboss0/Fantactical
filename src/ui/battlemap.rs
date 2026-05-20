@@ -1,9 +1,12 @@
+use crate::logging::LogEvent;
+use crate::model::gcs_import::import_gcs_json;
+use crate::model::{
+    sort_turn_order, ActorId, EventLog, GameState, GameStateHistory, ManeuverType, PainThreshold,
+    Posture, Srgba, TurnPhase,
+};
+use crate::settings::{save_settings, srgb_to_bevy_color};
 use bevy::prelude::*;
 use bevy::sprite::{AlphaMode2d, ColorMaterial, MeshMaterial2d};
-use crate::model::{sort_turn_order, ActorId, EventLog, GameState, GameStateHistory, ManeuverType, PainThreshold, Posture, Srgba, TurnPhase};
-use crate::model::gcs_import::import_gcs_json;
-use crate::logging::LogEvent;
-use crate::settings::{save_settings, srgb_to_bevy_color};
 
 pub struct BattlemapPlugin;
 
@@ -18,21 +21,27 @@ impl Plugin for BattlemapPlugin {
             .add_event::<GmActionEvent>()
             .add_event::<TokenRightClickedEvent>()
             .add_systems(Startup, (setup_battlemap, import_example_sheet).chain())
-            .add_systems(PreUpdate, (
-                handle_import_sheet,
-                handle_reload_sheet,
-                handle_remove_actor,
-                handle_gm_actions,
-            ))
-            .add_systems(Update, (
-                detect_token_right_click,
-                sync_tokens,
-                draw_grid,
-                draw_hex_outlines,
-                draw_relation_arrows,
-                update_hp_bars,
-                camera_controls,
-            ))
+            .add_systems(
+                PreUpdate,
+                (
+                    handle_import_sheet,
+                    handle_reload_sheet,
+                    handle_remove_actor,
+                    handle_gm_actions,
+                ),
+            )
+            .add_systems(
+                Update,
+                (
+                    detect_token_right_click,
+                    sync_tokens,
+                    draw_grid,
+                    draw_hex_outlines,
+                    draw_relation_arrows,
+                    update_hp_bars,
+                    camera_controls,
+                ),
+            )
             .add_systems(First, detect_drag_input);
     }
 }
@@ -55,14 +64,35 @@ pub struct RemoveActorEvent {
 
 #[derive(Event, Debug, Clone)]
 pub enum GmActionEvent {
-    AddModifier { label: String, value: i8, actor_id: Option<ActorId> },
-    RemoveModifier { index: usize, actor_id: Option<ActorId> },
+    AddModifier {
+        label: String,
+        value: i8,
+        actor_id: Option<ActorId>,
+    },
+    RemoveModifier {
+        index: usize,
+        actor_id: Option<ActorId>,
+    },
     Rewind,
-    ShockEnabled { enabled: bool },
-    PainThreshold { actor_id: ActorId, threshold: PainThreshold },
-    MoveActor { actor_id: ActorId, position: (i32, i32) },
-    SetPosture { actor_id: ActorId, posture: Posture },
-    ReorderTurnOrder { from_index: usize, to_index: usize },
+    ShockEnabled {
+        enabled: bool,
+    },
+    PainThreshold {
+        actor_id: ActorId,
+        threshold: PainThreshold,
+    },
+    MoveActor {
+        actor_id: ActorId,
+        position: (i32, i32),
+    },
+    SetPosture {
+        actor_id: ActorId,
+        posture: Posture,
+    },
+    ReorderTurnOrder {
+        from_index: usize,
+        to_index: usize,
+    },
 }
 
 #[derive(Event, Debug)]
@@ -70,6 +100,7 @@ pub struct TokenRightClickedEvent {
     pub actor_id: ActorId,
 }
 
+#[allow(clippy::too_many_arguments)]
 fn handle_import_sheet(
     mut events: EventReader<ImportSheetEvent>,
     mut state: Option<ResMut<GameStateResource>>,
@@ -101,14 +132,22 @@ fn handle_import_sheet(
 
         let history = &mut state_res.history;
 
-        let new_id: ActorId = history.current().actors.keys().max().map(|id| id + 1).unwrap_or(1);
+        let new_id: ActorId = history
+            .current()
+            .actors
+            .keys()
+            .max()
+            .map(|id| id + 1)
+            .unwrap_or(1);
         actor.id = new_id;
         actor.source_path = Some(ev.path.clone());
         actor.position = (5, new_id as i32 % 20);
 
         let actor_name = actor.name.clone();
-        let hp_info = format!("HP {}/{}, ST {}, DX {}, IQ {}, HT {}",
-            actor.hp_current, actor.hp_max, actor.st, actor.dx, actor.iq, actor.ht);
+        let hp_info = format!(
+            "HP {}/{}, ST {}, DX {}, IQ {}, HT {}",
+            actor.hp_current, actor.hp_max, actor.st, actor.dx, actor.iq, actor.ht
+        );
 
         if let Some(img_data) = &actor.portrait_data {
             if let Ok(dyn_img) = image::load_from_memory(img_data) {
@@ -116,7 +155,9 @@ fn handle_import_sheet(
                 let (w, h) = (rgba.width(), rgba.height());
                 let bevy_img = Image::new_fill(
                     bevy::render::render_resource::Extent3d {
-                        width: w, height: h, depth_or_array_layers: 1,
+                        width: w,
+                        height: h,
+                        depth_or_array_layers: 1,
                     },
                     bevy::render::render_resource::TextureDimension::D2,
                     &rgba,
@@ -139,11 +180,14 @@ fn handle_import_sheet(
 
         history.push(new_state.clone());
 
-        log_events.send(LogEvent::info(format!("Imported sheet: {actor_name} — {hp_info}"))
-            .with_context(new_state.round, new_id));
+        log_events.send(
+            LogEvent::info(format!("Imported sheet: {actor_name} — {hp_info}"))
+                .with_context(new_state.round, new_id),
+        );
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn handle_reload_sheet(
     mut events: EventReader<ReloadSheetEvent>,
     mut state: Option<ResMut<GameStateResource>>,
@@ -177,7 +221,10 @@ fn handle_reload_sheet(
         let current = history.current();
 
         let Some(existing) = current.actors.get(&ev.actor_id) else {
-            log_events.send(LogEvent::warn(format!("Actor #{} not found for reload", ev.actor_id)));
+            log_events.send(LogEvent::warn(format!(
+                "Actor #{} not found for reload",
+                ev.actor_id
+            )));
             continue;
         };
 
@@ -220,7 +267,9 @@ fn handle_reload_sheet(
                 let (w, h) = (rgba.width(), rgba.height());
                 let bevy_img = Image::new_fill(
                     bevy::render::render_resource::Extent3d {
-                        width: w, height: h, depth_or_array_layers: 1,
+                        width: w,
+                        height: h,
+                        depth_or_array_layers: 1,
                     },
                     bevy::render::render_resource::TextureDimension::D2,
                     &rgba,
@@ -239,7 +288,10 @@ fn handle_reload_sheet(
 
         history.push(new_state);
 
-        log_events.send(LogEvent::info(format!("Reloaded sheet for actor #{}", ev.actor_id)));
+        log_events.send(LogEvent::info(format!(
+            "Reloaded sheet for actor #{}",
+            ev.actor_id
+        )));
     }
 }
 
@@ -258,7 +310,10 @@ fn handle_remove_actor(
         let current = history.current();
 
         let Some(actor) = current.actors.get(&ev.actor_id) else {
-            log_events.send(LogEvent::warn(format!("Actor #{} not found for removal", ev.actor_id)));
+            log_events.send(LogEvent::warn(format!(
+                "Actor #{} not found for removal",
+                ev.actor_id
+            )));
             continue;
         };
 
@@ -282,6 +337,7 @@ fn handle_remove_actor(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn handle_gm_actions(
     mut events: EventReader<GmActionEvent>,
     mut state: Option<ResMut<GameStateResource>>,
@@ -290,8 +346,14 @@ fn handle_gm_actions(
 ) {
     for ev in events.read() {
         match ev {
-            GmActionEvent::AddModifier { label, value, actor_id } => {
-                let Some(ref mut state_res) = state else { continue };
+            GmActionEvent::AddModifier {
+                label,
+                value,
+                actor_id,
+            } => {
+                let Some(ref mut state_res) = state else {
+                    continue;
+                };
                 let modifier = crate::model::Modifier {
                     label: label.clone(),
                     value: *value,
@@ -308,7 +370,9 @@ fn handle_gm_actions(
                 state_res.history.push(new_state);
             }
             GmActionEvent::RemoveModifier { index, actor_id } => {
-                let Some(ref mut state_res) = state else { continue };
+                let Some(ref mut state_res) = state else {
+                    continue;
+                };
                 let mut new_state = state_res.history.current().clone();
                 if let Some(aid) = actor_id {
                     if let Some(actor) = new_state.actors.get_mut(aid) {
@@ -324,7 +388,9 @@ fn handle_gm_actions(
                 state_res.history.push(new_state);
             }
             GmActionEvent::Rewind => {
-                let Some(ref mut state_res) = state else { continue };
+                let Some(ref mut state_res) = state else {
+                    continue;
+                };
                 let prev_snapshot = state_res.history.current;
                 let round_before = state_res.history.current().round;
                 if state_res.history.rewind().is_some() {
@@ -339,7 +405,10 @@ fn handle_gm_actions(
                     }
                     log_events.send(LogEvent::info(format!(
                         "Rewind: snapshot {} → {} (R{} → R{})",
-                        prev_snapshot, state_res.history.current, round_before, state_res.history.current().round,
+                        prev_snapshot,
+                        state_res.history.current,
+                        round_before,
+                        state_res.history.current().round,
                     )));
                 }
             }
@@ -349,8 +418,13 @@ fn handle_gm_actions(
                     save_settings(&s.settings);
                 }
             }
-            GmActionEvent::PainThreshold { actor_id, threshold } => {
-                let Some(ref mut state_res) = state else { continue };
+            GmActionEvent::PainThreshold {
+                actor_id,
+                threshold,
+            } => {
+                let Some(ref mut state_res) = state else {
+                    continue;
+                };
                 let mut new_state = state_res.history.current().clone();
                 if let Some(actor) = new_state.actors.get_mut(actor_id) {
                     actor.pain_threshold = *threshold;
@@ -358,7 +432,9 @@ fn handle_gm_actions(
                 state_res.history.push(new_state);
             }
             GmActionEvent::MoveActor { actor_id, position } => {
-                let Some(ref mut state_res) = state else { continue };
+                let Some(ref mut state_res) = state else {
+                    continue;
+                };
                 let mut new_state = state_res.history.current().clone();
                 if let Some(actor) = new_state.actors.get_mut(actor_id) {
                     actor.position = *position;
@@ -366,19 +442,32 @@ fn handle_gm_actions(
                 state_res.history.push(new_state);
             }
             GmActionEvent::SetPosture { actor_id, posture } => {
-                let Some(ref mut state_res) = state else { continue };
+                let Some(ref mut state_res) = state else {
+                    continue;
+                };
                 let mut new_state = state_res.history.current().clone();
                 if let Some(actor) = new_state.actors.get_mut(actor_id) {
                     actor.posture = *posture;
                 }
                 state_res.history.push(new_state);
             }
-            GmActionEvent::ReorderTurnOrder { from_index, to_index } => {
-                let Some(ref mut state_res) = state else { continue };
+            GmActionEvent::ReorderTurnOrder {
+                from_index,
+                to_index,
+            } => {
+                let Some(ref mut state_res) = state else {
+                    continue;
+                };
                 let mut new_state = state_res.history.current().clone();
-                if *from_index < new_state.turn_order.len() && *to_index <= new_state.turn_order.len() {
+                if *from_index < new_state.turn_order.len()
+                    && *to_index <= new_state.turn_order.len()
+                {
                     let actor_id = new_state.turn_order.remove(*from_index);
-                    let insert_at = if *to_index > *from_index { to_index - 1 } else { *to_index };
+                    let insert_at = if *to_index > *from_index {
+                        to_index - 1
+                    } else {
+                        *to_index
+                    };
                     new_state.turn_order.insert(insert_at, actor_id);
                 }
                 state_res.history.push(new_state);
@@ -400,8 +489,18 @@ impl Default for BattlemapConfig {
         Self {
             hex_size: 32.0,
             grid_extent: 20,
-            grid_color: Srgba { r: 0.15, g: 0.15, b: 0.15, a: 0.6 },
-            background_color: Srgba { r: 0.05, g: 0.05, b: 0.05, a: 1.0 },
+            grid_color: Srgba {
+                r: 0.15,
+                g: 0.15,
+                b: 0.15,
+                a: 0.6,
+            },
+            background_color: Srgba {
+                r: 0.05,
+                g: 0.05,
+                b: 0.05,
+                a: 1.0,
+            },
         }
     }
 }
@@ -490,18 +589,24 @@ fn import_example_sheet(world: &mut World) {
             let (w, h) = (rgba.width(), rgba.height());
             let bevy_img = Image::new_fill(
                 bevy::render::render_resource::Extent3d {
-                    width: w, height: h, depth_or_array_layers: 1,
+                    width: w,
+                    height: h,
+                    depth_or_array_layers: 1,
                 },
                 bevy::render::render_resource::TextureDimension::D2,
                 &rgba,
                 bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
                 bevy::asset::RenderAssetUsages::RENDER_WORLD,
             );
-            let handle = world.resource_mut::<bevy::asset::Assets<Image>>().add(bevy_img);
+            let handle = world
+                .resource_mut::<bevy::asset::Assets<Image>>()
+                .add(bevy_img);
             portrait_images.insert(actor.id, handle);
         }
     }
-    world.insert_resource(PortraitCacheRes { images: portrait_images });
+    world.insert_resource(PortraitCacheRes {
+        images: portrait_images,
+    });
 
     let mut actors = std::collections::HashMap::new();
     actors.insert(actor.id, actor.clone());
@@ -530,8 +635,10 @@ fn import_example_sheet(world: &mut World) {
     });
     world.insert_resource(EventLogResource { log });
 
-    info!("Imported GCS sheet: {} (HP {}/{}, ST {}, DX {}, IQ {}, HT {})",
-        actor.name, actor.hp_current, actor.hp_max, actor.st, actor.dx, actor.iq, actor.ht);
+    info!(
+        "Imported GCS sheet: {} (HP {}/{}, ST {}, DX {}, IQ {}, HT {})",
+        actor.name, actor.hp_current, actor.hp_max, actor.st, actor.dx, actor.iq, actor.ht
+    );
 }
 
 fn setup_battlemap(mut commands: Commands) {
@@ -543,6 +650,7 @@ fn hex_mesh(radius: f32) -> Mesh {
     Mesh::from(RegularPolygon::new(radius, 6))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn detect_drag_input(
     mouse: Res<ButtonInput<MouseButton>>,
     mut drag_state: ResMut<TokenDragState>,
@@ -563,10 +671,14 @@ fn detect_drag_input(
     }
 
     let Some(state) = state else { return };
-    let Ok(window) = window.get_single() else { return };
+    let Ok(window) = window.get_single() else {
+        return;
+    };
     let cursor = window.cursor_position();
-    let win_size = Vec2::new(window.width() as f32, window.height() as f32);
-    let Ok((cam, proj)) = cameras.get_single() else { return };
+    let win_size = Vec2::new(window.width(), window.height());
+    let Ok((cam, proj)) = cameras.get_single() else {
+        return;
+    };
     let cursor_hex = crate::ui::panels::hex_under_cursor(cursor, cam, proj, 32.0, win_size);
 
     let current = state.history.current();
@@ -581,17 +693,17 @@ fn detect_drag_input(
         for (&actor_id, actor) in &current.actors {
             let actor_world = world_position(actor.position.0, actor.position.1, 32.0);
             let dist = p_world.distance(actor_world);
-            if dist < 32.0 {
-                if closest_actor.map_or(true, |(_, d)| dist < d) {
-                    closest_actor = Some((actor_id, dist));
-                }
+            if dist < 32.0 && closest_actor.map(|(_, d)| dist < d).unwrap_or(true) {
+                closest_actor = Some((actor_id, dist));
             }
         }
     }
 
     if left_pressed {
-        info!("Token drag: left_pressed, cursor={:?}, cursor_hex={:?}, closest={:?}",
-            cursor, cursor_hex, closest_actor);
+        info!(
+            "Token drag: left_pressed, cursor={:?}, cursor_hex={:?}, closest={:?}",
+            cursor, cursor_hex, closest_actor
+        );
         if let Some((actor_id, _dist)) = closest_actor {
             drag_state.dragging = Some(actor_id);
             info!("Token drag: started dragging actor {}", actor_id);
@@ -600,9 +712,15 @@ fn detect_drag_input(
 
     if let Some(actor_id) = drag_state.dragging {
         if left_released {
-            info!("Token drag: left_released, actor={}, cursor_hex={:?}", actor_id, cursor_hex);
+            info!(
+                "Token drag: left_released, actor={}, cursor_hex={:?}",
+                actor_id, cursor_hex
+            );
             if let Some(hex) = cursor_hex {
-                move_events.send(GmActionEvent::MoveActor { actor_id, position: hex });
+                move_events.send(GmActionEvent::MoveActor {
+                    actor_id,
+                    position: hex,
+                });
                 info!("Token drag: moving actor {} to {:?}", actor_id, hex);
             }
             drag_state.dragging = None;
@@ -621,12 +739,18 @@ fn detect_token_right_click(
         return;
     }
     let Some(state) = state else { return };
-    let Ok(window) = window.get_single() else { return };
+    let Ok(window) = window.get_single() else {
+        return;
+    };
     let cursor = window.cursor_position();
-    let win_size = Vec2::new(window.width() as f32, window.height() as f32);
-    let Ok((cam, proj)) = cameras.get_single() else { return };
+    let win_size = Vec2::new(window.width(), window.height());
+    let Ok((cam, proj)) = cameras.get_single() else {
+        return;
+    };
 
-    let Some(hex) = crate::ui::panels::hex_under_cursor(cursor, cam, proj, 32.0, win_size) else { return };
+    let Some(hex) = crate::ui::panels::hex_under_cursor(cursor, cam, proj, 32.0, win_size) else {
+        return;
+    };
 
     let current = state.history.current();
     for (&actor_id, actor) in &current.actors {
@@ -637,6 +761,7 @@ fn detect_token_right_click(
     }
 }
 
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 fn sync_tokens(
     state: Option<Res<GameStateResource>>,
     portraits: Option<Res<PortraitCacheRes>>,
@@ -649,18 +774,25 @@ fn sync_tokens(
     mut assets_mesh: ResMut<Assets<Mesh>>,
     mut spawned: Local<Option<std::collections::HashMap<ActorId, Entity>>>,
     mut commands: Commands,
-    mut existing: Query<(Entity, &TokenMarker, &mut Transform), (Without<Camera>, Without<HpBarMarker>)>,
+    mut existing: Query<
+        (Entity, &TokenMarker, &mut Transform),
+        (Without<Camera>, Without<HpBarMarker>),
+    >,
 ) {
     let Some(state) = state else { return };
     let current = state.history.current();
 
     // --- Drag visual update ---
     if let Some(actor_id) = drag_state.dragging {
-        let Ok(window_res) = window.get_single() else { return };
+        let Ok(window_res) = window.get_single() else {
+            return;
+        };
         let cursor = window_res.cursor_position();
-        let win_size = Vec2::new(window_res.width() as f32, window_res.height() as f32);
+        let win_size = Vec2::new(window_res.width(), window_res.height());
         if let Ok((cam, proj)) = cameras.get_single() {
-            if let Some(hex) = crate::ui::panels::hex_under_cursor(cursor, cam, proj, 32.0, win_size) {
+            if let Some(hex) =
+                crate::ui::panels::hex_under_cursor(cursor, cam, proj, 32.0, win_size)
+            {
                 let new_world = world_position(hex.0, hex.1, 32.0);
                 for (_, marker, mut transform) in &mut existing {
                     if marker.actor_id == actor_id {
@@ -705,9 +837,10 @@ fn sync_tokens(
 
             let hex_handle = {
                 let mesh_map = meshes.as_mut().unwrap();
-                mesh_map.entry(hex_r.to_bits()).or_insert_with(|| {
-                    assets_mesh.add(hex_mesh(hex_r))
-                }).clone()
+                mesh_map
+                    .entry(hex_r.to_bits())
+                    .or_insert_with(|| assets_mesh.add(hex_mesh(hex_r)))
+                    .clone()
             };
 
             let portrait_mat = if let Some(p) = &portraits {
@@ -732,48 +865,58 @@ fn sync_tokens(
                 })
             };
 
-            let parent_id = commands.spawn((
-                TokenMarker { actor_id: *id },
-                Transform::from_translation(pos.extend(0.1)),
-                Visibility::Visible,
-            )).id();
+            let parent_id = commands
+                .spawn((
+                    TokenMarker { actor_id: *id },
+                    Transform::from_translation(pos.extend(0.1)),
+                    Visibility::Visible,
+                ))
+                .id();
 
-            let portrait_id = commands.spawn((
-                Mesh2d(hex_handle.clone()),
-                MeshMaterial2d(portrait_mat),
-                Transform::from_rotation(Quat::from_rotation_z(30f32.to_radians())),
-            )).id();
+            let portrait_id = commands
+                .spawn((
+                    Mesh2d(hex_handle.clone()),
+                    MeshMaterial2d(portrait_mat),
+                    Transform::from_rotation(Quat::from_rotation_z(30f32.to_radians())),
+                ))
+                .id();
             commands.entity(parent_id).add_child(portrait_id);
 
-            let hp_border_id = commands.spawn((
-                Sprite {
-                    color: Color::BLACK,
-                    custom_size: Some(Vec2::new(bar_w + 4.0, bar_h + 2.0)),
-                    ..default()
-                },
-                Transform::from_xyz(0.0, bar_y, 0.15),
-            )).id();
+            let hp_border_id = commands
+                .spawn((
+                    Sprite {
+                        color: Color::BLACK,
+                        custom_size: Some(Vec2::new(bar_w + 4.0, bar_h + 2.0)),
+                        ..default()
+                    },
+                    Transform::from_xyz(0.0, bar_y, 0.15),
+                ))
+                .id();
             commands.entity(parent_id).add_child(hp_border_id);
 
-            let hp_bg_id = commands.spawn((
-                Sprite {
-                    color: Color::srgba(0.8, 0.2, 0.2, 1.0),
-                    custom_size: Some(Vec2::new(bar_w, bar_h)),
-                    ..default()
-                },
-                Transform::from_xyz(0.0, bar_y, 0.18),
-            )).id();
+            let hp_bg_id = commands
+                .spawn((
+                    Sprite {
+                        color: Color::srgba(0.8, 0.2, 0.2, 1.0),
+                        custom_size: Some(Vec2::new(bar_w, bar_h)),
+                        ..default()
+                    },
+                    Transform::from_xyz(0.0, bar_y, 0.18),
+                ))
+                .id();
             commands.entity(parent_id).add_child(hp_bg_id);
 
-            let hp_id = commands.spawn((
-                HpBarMarker,
-                Sprite {
-                    color: Color::srgba(0.267, 0.667, 0.267, 0.9),
-                    custom_size: Some(Vec2::new(bar_w, bar_h)),
-                    ..default()
-                },
-                Transform::from_xyz(0.0, bar_y, 0.2),
-            )).id();
+            let hp_id = commands
+                .spawn((
+                    HpBarMarker,
+                    Sprite {
+                        color: Color::srgba(0.267, 0.667, 0.267, 0.9),
+                        custom_size: Some(Vec2::new(bar_w, bar_h)),
+                        ..default()
+                    },
+                    Transform::from_xyz(0.0, bar_y, 0.2),
+                ))
+                .id();
             commands.entity(parent_id).add_child(hp_id);
 
             map.insert(*id, parent_id);
@@ -795,10 +938,7 @@ fn sync_tokens(
     }
 }
 
-fn draw_grid(
-    config: Res<BattlemapConfig>,
-    mut gizmos: Gizmos,
-) {
+fn draw_grid(config: Res<BattlemapConfig>, mut gizmos: Gizmos) {
     let color = srgb_to_bevy_color(config.grid_color);
     let size = config.hex_size;
     let half = config.grid_extent as i32;
@@ -845,8 +985,12 @@ fn update_hp_bars(
     let bar_h = 4.0;
 
     for (parent, mut sprite, mut transform) in &mut hp_bars {
-        let Ok((marker, _token_transform)) = tokens.get(parent.get()) else { continue };
-        let Some(actor) = current.actors.get(&marker.actor_id) else { continue };
+        let Ok((marker, _token_transform)) = tokens.get(parent.get()) else {
+            continue;
+        };
+        let Some(actor) = current.actors.get(&marker.actor_id) else {
+            continue;
+        };
 
         let hp_ratio = (actor.hp_current as f32 / actor.hp_max.max(1) as f32).clamp(0.0, 1.0);
         let hp_color = if hp_ratio <= 0.0 {
@@ -892,7 +1036,9 @@ fn camera_controls(
         cam_transform.translation.x += pan_speed;
     }
 
-    let Ok(window) = window.get_single() else { return };
+    let Ok(window) = window.get_single() else {
+        return;
+    };
     let cursor = window.cursor_position();
 
     if mouse.just_pressed(MouseButton::Middle) {
@@ -912,7 +1058,7 @@ fn camera_controls(
 
     for ev in scroll_evr.read() {
         if !keyboard.pressed(KeyCode::ShiftLeft) && !keyboard.pressed(KeyCode::ShiftRight) {
-            projection.scale = (projection.scale - ev.y * zoom_speed).max(0.1).min(5.0);
+            projection.scale = (projection.scale - ev.y * zoom_speed).clamp(0.1, 5.0);
         }
     }
 }
@@ -927,8 +1073,12 @@ fn draw_relation_arrows(
     let hex_size = config.hex_size;
 
     for relation in &current.relations {
-        let Some(source) = current.actors.get(&relation.source) else { continue };
-        let Some(target) = current.actors.get(&relation.target) else { continue };
+        let Some(source) = current.actors.get(&relation.source) else {
+            continue;
+        };
+        let Some(target) = current.actors.get(&relation.target) else {
+            continue;
+        };
 
         let start = world_position(source.position.0, source.position.1, hex_size);
         let end = world_position(target.position.0, target.position.1, hex_size);
@@ -968,21 +1118,28 @@ fn draw_relation_arrows(
 fn maneuver_arrow_color(maneuver: ManeuverType) -> Color {
     use ManeuverType as Mt;
     match maneuver {
-        Mt::Attack | Mt::Feint | Mt::FeignBeat | Mt::FeignDefensive | Mt::FeignRuse | Mt::Evaluate => {
-            Color::srgba(0.8, 0.2, 0.2, 0.9)
-        }
-        Mt::AllOutAttackDetermined | Mt::AllOutAttackDouble | Mt::AllOutAttackFeint
-        | Mt::AllOutAttackLong | Mt::AllOutAttackStrong | Mt::AllOutAttackRangedDetermined
-        | Mt::CommittedAttackDetermined | Mt::CommittedAttackStrong => {
-            Color::srgba(1.0, 0.4, 0.0, 0.9)
-        }
+        Mt::Attack
+        | Mt::Feint
+        | Mt::FeignBeat
+        | Mt::FeignDefensive
+        | Mt::FeignRuse
+        | Mt::Evaluate => Color::srgba(0.8, 0.2, 0.2, 0.9),
+        Mt::AllOutAttackDetermined
+        | Mt::AllOutAttackDouble
+        | Mt::AllOutAttackFeint
+        | Mt::AllOutAttackLong
+        | Mt::AllOutAttackStrong
+        | Mt::AllOutAttackRangedDetermined
+        | Mt::CommittedAttackDetermined
+        | Mt::CommittedAttackStrong => Color::srgba(1.0, 0.4, 0.0, 0.9),
         Mt::Aim | Mt::Move | Mt::MoveAndAttack | Mt::ChangePosture => {
             Color::srgba(0.8, 0.667, 0.0, 0.9)
         }
-        Mt::AllOutDefenseIncreased | Mt::AllOutDefenseDouble | Mt::AllOutDefenseMental
-        | Mt::DefensiveAttack | Mt::Ready => {
-            Color::srgba(0.2, 0.4, 0.6, 0.9)
-        }
+        Mt::AllOutDefenseIncreased
+        | Mt::AllOutDefenseDouble
+        | Mt::AllOutDefenseMental
+        | Mt::DefensiveAttack
+        | Mt::Ready => Color::srgba(0.2, 0.4, 0.6, 0.9),
         Mt::Concentrate | Mt::AllOutConcentrate | Mt::DoNothing | Mt::Wait => {
             Color::srgba(0.467, 0.333, 0.667, 0.9)
         }

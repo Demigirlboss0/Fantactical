@@ -1,7 +1,7 @@
 use std::path::Path;
 
-use anyhow::Context;
 use crate::model::GameStateHistory;
+use anyhow::Context;
 
 pub fn save_history(history: &GameStateHistory, path: &Path) -> anyhow::Result<()> {
     let json = serde_json::to_string_pretty(history)?;
@@ -60,9 +60,6 @@ mod tests {
     #[test]
     fn test_save_file_naming() {
         let path = save_file_path("combat", 3, Path::new("/tmp"));
-        assert_eq!(
-            path.to_str().unwrap(),
-            "/tmp/combat_round3.json"
-        );
+        assert_eq!(path.to_str().unwrap(), "/tmp/combat_round3.json");
     }
 }

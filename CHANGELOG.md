@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- Verify Nix package names for Bevy linkage and add .tangled/workflows/ci.yml (#68)
+- Run cargo fmt across entire codebase (#66)
 - Implement WebSocket client with reconnect logic for network multiplayer (#19)
 - Implement authoritative WebSocket server for network multiplayer sync (#18)
 - Add comprehensive test suite for WebSocket networking (serialization, message roundtrip, integration) (#65)
@@ -34,6 +36,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bevy ECS scaffolding with resources, plugins, systems (#1–#6)
 
 ### Fixed
+- Fix all clippy warnings so -D warnings passes clean (#67)
 - Seed RNG with hashed system time to eliminate determinism (#62)
 - Add dice roll results to event log for attack, defense, and damage rolls (#61)
 - Fix All-Out Attack not disabling active defenses for the attacker (#60)

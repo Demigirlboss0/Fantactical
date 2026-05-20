@@ -1,14 +1,14 @@
 use clap::{Parser, Subcommand};
+use fantactical::model::injury::resolve_injury;
+use fantactical::model::maneuver_legality::available_maneuvers;
+use fantactical::model::rolls::{check_roll, roll_damage, RollOutcome};
+use fantactical::model::{
+    Actor, Attack, DamageType, Encumbrance, GameState, GameStateHistory, HitLocation, LegState,
+    PainThreshold, Posture, StatusFlags, TurnPhase,
+};
+use fantactical::state::history;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use fantactical::model::{
-    Actor, ActorId, Attack, DamageType, GameState, GameStateHistory, HitLocation,
-    TurnPhase, Posture, Encumbrance, StatusFlags, LegState, PainThreshold,
-};
-use fantactical::model::injury::resolve_injury;
-use fantactical::model::rolls::{check_roll, roll_3d6, roll_damage, RollOutcome};
-use fantactical::model::maneuver_legality::available_maneuvers;
-use fantactical::state::history;
 
 #[derive(Parser)]
 #[command(name = "ftctl")]
@@ -97,14 +97,20 @@ fn main() {
             println!("{}d{:+}: {}", dice, adds, dmg);
         }
 
-        Command::TestInjury { hp, location, damage, damage_type, dr } => {
+        Command::TestInjury {
+            hp,
+            location,
+            damage,
+            damage_type,
+            dr,
+        } => {
             let loc = parse_location(&location);
             let dt = parse_damage_type(&damage_type);
 
             let mut armor = vec![];
             if let Some(dr_val) = dr {
                 let mut dr_map = HashMap::new();
-                dr_map.insert(loc, dr_val as u8);
+                dr_map.insert(loc, dr_val);
                 armor.push(fantactical::model::ArmorPiece {
                     name: "Test Armor".into(),
                     dr: dr_map,
@@ -118,7 +124,10 @@ fn main() {
                 portrait_data: None,
                 source_path: None,
                 is_npc: true,
-                st: 10, dx: 10, iq: 10, ht: 10,
+                st: 10,
+                dx: 10,
+                iq: 10,
+                ht: 10,
                 hp_max: hp,
                 fp_max: 10,
                 basic_speed: 6.0,
@@ -172,10 +181,23 @@ fn main() {
                     println!("HP: {} → {}", hp, updated.hp_current);
                     println!("Shock penalty: {}", outcome.shock_penalty);
                     println!("Major wound: {}", outcome.major_wound);
-                    println!("Knockdown: {} (mod {})", outcome.knockdown, outcome.knockdown_modifier);
+                    println!(
+                        "Knockdown: {} (mod {})",
+                        outcome.knockdown, outcome.knockdown_modifier
+                    );
                     println!("Stunned: {}", outcome.stunned);
-                    println!("Limb crippled: {:?}", outcome.limb_crippled.iter().map(|l| format!("{:?}", l.location)).collect::<Vec<_>>());
-                    println!("Consciousness roll: {} (penalty {})", outcome.consciousness_roll_needed, outcome.consciousness_penalty);
+                    println!(
+                        "Limb crippled: {:?}",
+                        outcome
+                            .limb_crippled
+                            .iter()
+                            .map(|l| format!("{:?}", l.location))
+                            .collect::<Vec<_>>()
+                    );
+                    println!(
+                        "Consciousness roll: {} (penalty {})",
+                        outcome.consciousness_roll_needed, outcome.consciousness_penalty
+                    );
                     println!("Dead: {}", outcome.dead);
                 }
                 Err(e) => {
@@ -184,15 +206,22 @@ fn main() {
             }
         }
 
-        Command::AvailableManeuvers { posture, status, encumbrance } => {
-            let mut actor = Actor {
+        Command::AvailableManeuvers {
+            posture,
+            status,
+            encumbrance,
+        } => {
+            let actor = Actor {
                 id: 1,
                 name: "Test".into(),
                 portrait_path: None,
                 portrait_data: None,
                 source_path: None,
                 is_npc: false,
-                st: 10, dx: 10, iq: 10, ht: 10,
+                st: 10,
+                dx: 10,
+                iq: 10,
+                ht: 10,
                 hp_max: 10,
                 fp_max: 10,
                 basic_speed: 6.0,
@@ -209,7 +238,9 @@ fn main() {
                     parry_bonus: Some(0),
                     block_bonus: None,
                     is_ranged: false,
-                    acc: None, rof: None, rcl: None,
+                    acc: None,
+                    rof: None,
+                    rcl: None,
                 }],
                 skills: vec![],
                 armor: vec![],
@@ -233,7 +264,10 @@ fn main() {
             };
 
             let maneuvers = available_maneuvers(&actor);
-            println!("Posture: {:?}, Encumbrance: {:?}, Status: {:?}", actor.posture, actor.encumbrance, status);
+            println!(
+                "Posture: {:?}, Encumbrance: {:?}, Status: {:?}",
+                actor.posture, actor.encumbrance, status
+            );
             println!("Available maneuvers: {:?}", maneuvers);
             println!("Count: {}", maneuvers.len());
         }
@@ -245,11 +279,14 @@ fn main() {
 
         Command::HexDistance { q1, r1, q2, r2 } => {
             let dist = fantactical::model::hex_distance((q1, r1), (q2, r2));
-            println!("Hex distance ({}, {}) to ({}, {}): {} yd", q1, r1, q2, r2, dist);
+            println!(
+                "Hex distance ({}, {}) to ({}, {}): {} yd",
+                q1, r1, q2, r2, dist
+            );
         }
 
         Command::SaveState { path, round } => {
-            let mut actors = HashMap::new();
+            let actors = HashMap::new();
             let state = GameState {
                 actors,
                 relations: vec![],
@@ -267,16 +304,18 @@ fn main() {
             println!("Saved state to {}", path.display());
         }
 
-        Command::LoadState { path } => {
-            match history::load_history(&path) {
-                Ok(history) => {
-                    let current = history.current();
-                    println!("Loaded state: round {}, {} snapshots, {} actors",
-                        current.round, history.snapshots.len(), current.actors.len());
-                }
-                Err(e) => eprintln!("Load error: {e}"),
+        Command::LoadState { path } => match history::load_history(&path) {
+            Ok(history) => {
+                let current = history.current();
+                println!(
+                    "Loaded state: round {}, {} snapshots, {} actors",
+                    current.round,
+                    history.snapshots.len(),
+                    current.actors.len()
+                );
             }
-        }
+            Err(e) => eprintln!("Load error: {e}"),
+        },
     }
 }
 
@@ -352,10 +391,22 @@ fn parse_encumbrance(s: &str) -> Encumbrance {
 fn parse_status(s: &str) -> StatusFlags {
     let normal = StatusFlags::default();
     match s.to_lowercase().as_str() {
-        "dead" => StatusFlags { dead: true, ..normal },
-        "unconscious" | "uncon" => StatusFlags { unconscious: true, ..normal },
-        "stunned" | "stun" => StatusFlags { stunned: true, ..normal },
-        "knocked_down" | "knockdown" | "kd" => StatusFlags { knocked_down: true, ..normal },
+        "dead" => StatusFlags {
+            dead: true,
+            ..normal
+        },
+        "unconscious" | "uncon" => StatusFlags {
+            unconscious: true,
+            ..normal
+        },
+        "stunned" | "stun" => StatusFlags {
+            stunned: true,
+            ..normal
+        },
+        "knocked_down" | "knockdown" | "kd" => StatusFlags {
+            knocked_down: true,
+            ..normal
+        },
         _ => normal,
     }
 }

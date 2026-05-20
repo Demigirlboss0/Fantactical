@@ -4,17 +4,16 @@ use serde_json::Value;
 pub fn import_gcs_json(json_str: &str) -> anyhow::Result<Actor> {
     let root: Value = serde_json::from_str(json_str)?;
 
-    let profile = root.get("profile").ok_or_else(|| anyhow::anyhow!("Missing profile"))?;
+    let profile = root
+        .get("profile")
+        .ok_or_else(|| anyhow::anyhow!("Missing profile"))?;
     let name = profile
         .get("name")
         .and_then(|v| v.as_str())
         .unwrap_or("Unknown")
         .to_string();
 
-    let gender = profile
-        .get("gender")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
+    let gender = profile.get("gender").and_then(|v| v.as_str()).unwrap_or("");
     let is_male = !gender.to_lowercase().contains("female");
 
     let sm = extract_sm(&root).unwrap_or(0);
@@ -35,8 +34,10 @@ pub fn import_gcs_json(json_str: &str) -> anyhow::Result<Actor> {
     let will = extract_attr_value(&root, "will").unwrap_or(iq);
     let per = extract_attr_value(&root, "per").unwrap_or(iq);
 
-    let basic_speed = extract_calc_float(&root, "basic_speed").unwrap_or((ht as f32 + dx as f32) / 4.0);
-    let basic_move_val = extract_calc_value(&root, "basic_move").unwrap_or((basic_speed.floor() as i16).max(1));
+    let basic_speed =
+        extract_calc_float(&root, "basic_speed").unwrap_or((ht as f32 + dx as f32) / 4.0);
+    let basic_move_val =
+        extract_calc_value(&root, "basic_move").unwrap_or((basic_speed.floor() as i16).max(1));
 
     let skills = extract_skills(&root);
     let (attacks, armor) = extract_combat_gear(&root);
@@ -64,8 +65,8 @@ pub fn import_gcs_json(json_str: &str) -> anyhow::Result<Actor> {
         sm,
         is_male,
         position: (0, 0),
-        hp_current: hp_current,
-        fp_current: fp_current,
+        hp_current,
+        fp_current,
         posture: Posture::Standing,
         encumbrance: Encumbrance::None,
         flags: StatusFlags::default(),
@@ -139,9 +140,7 @@ fn extract_portrait(root: &Value) -> Option<Vec<u8>> {
         return None;
     }
     use base64::Engine;
-    base64::engine::general_purpose::STANDARD
-        .decode(b64)
-        .ok()
+    base64::engine::general_purpose::STANDARD.decode(b64).ok()
 }
 
 fn extract_skills(root: &Value) -> Vec<Skill> {
@@ -271,16 +270,24 @@ fn extract_combat_gear(root: &Value) -> (Vec<Attack>, Vec<ArmorPiece>) {
     }
 
     if let Some(equipment) = root.get("equipment").and_then(|v| v.as_array()) {
-        fn collect_equipment_weapons(items: &[Value], attacks: &mut Vec<Attack>, armor: &mut Vec<ArmorPiece>) {
+        fn collect_equipment_weapons(
+            items: &[Value],
+            attacks: &mut Vec<Attack>,
+            armor: &mut Vec<ArmorPiece>,
+        ) {
             for item in items {
-                let equipped = item.get("equipped").and_then(|v| v.as_bool()).unwrap_or(false);
-                if !equipped {
-                    if item.get("children").is_none() {
-                        continue;
-                    }
+                let equipped = item
+                    .get("equipped")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                if !equipped && item.get("children").is_none() {
+                    continue;
                 }
 
-                let parent_desc = item.get("description").and_then(|v| v.as_str()).unwrap_or("");
+                let parent_desc = item
+                    .get("description")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
 
                 // Direct weapons on this equipment item
                 if let Some(weapons) = item.get("weapons").and_then(|v| v.as_array()) {
@@ -333,8 +340,15 @@ fn parse_weapon(weapon: &Value) -> Option<Attack> {
 }
 
 fn parse_weapon_impl(weapon: &Value, parent_desc: Option<&str>) -> Option<Attack> {
-    let usage = weapon.get("usage").and_then(|v| v.as_str()).unwrap_or("").to_string();
-    let desc = weapon.get("description").and_then(|v| v.as_str()).unwrap_or("");
+    let usage = weapon
+        .get("usage")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let desc = weapon
+        .get("description")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
 
     // Prefer parent description (equipment item name) over weapon description
     let effective_desc = parent_desc.unwrap_or(desc);
@@ -388,13 +402,23 @@ fn parse_weapon_impl(weapon: &Value, parent_desc: Option<&str>) -> Option<Attack
         .get("rate_of_fire")
         .and_then(|v| v.as_str())
         .and_then(parse_first_number)
-        .or_else(|| weapon.get("rof").and_then(|v| v.as_str()).and_then(parse_first_number));
+        .or_else(|| {
+            weapon
+                .get("rof")
+                .and_then(|v| v.as_str())
+                .and_then(parse_first_number)
+        });
 
     let rcl = weapon
         .get("recoil")
         .and_then(|v| v.as_str())
         .and_then(parse_first_number)
-        .or_else(|| weapon.get("rcl").and_then(|v| v.as_str()).and_then(parse_first_number));
+        .or_else(|| {
+            weapon
+                .get("rcl")
+                .and_then(|v| v.as_str())
+                .and_then(parse_first_number)
+        });
 
     let is_ranged = acc.is_some() || rof.is_some() || rcl.is_some();
 
@@ -525,7 +549,10 @@ fn parse_armor_piece(item: &Value, feature: &Value) -> Option<ArmorPiece> {
         return None;
     }
 
-    Some(ArmorPiece { name: description, dr })
+    Some(ArmorPiece {
+        name: description,
+        dr,
+    })
 }
 
 #[cfg(test)]
@@ -576,10 +603,7 @@ mod tests {
 
     #[test]
     fn test_import_gcs_example_sheet() {
-        let path = concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/Francesca Vanorder.gcs"
-        );
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/Francesca Vanorder.gcs");
         let json_str = std::fs::read_to_string(path).expect("Failed to read GCS file");
         let actor = import_gcs_json(&json_str).expect("Failed to import GCS JSON");
 
@@ -599,36 +623,59 @@ mod tests {
 
         // Francesca has 10 equipment weapons + 3 natural attacks
         let names: Vec<&str> = actor.attacks.iter().map(|a| a.name.as_str()).collect();
-        assert!(actor.attacks.len() >= 10, "Expected >=10 attacks, got {}: {:?}", actor.attacks.len(), names);
+        assert!(
+            actor.attacks.len() >= 10,
+            "Expected >=10 attacks, got {}: {:?}",
+            actor.attacks.len(),
+            names
+        );
         assert!(actor.skills.len() > 0, "Should have at least one skill");
-        assert!(actor.armor.len() > 0, "Should have at least one armor piece");
+        assert!(
+            actor.armor.len() > 0,
+            "Should have at least one armor piece"
+        );
 
         // Verify a ranged weapon was imported
         let has_ranged = actor.attacks.iter().any(|a| a.is_ranged);
-        assert!(has_ranged, "Expected at least one ranged weapon (Ruger Mini-14 or Reutech Protecta)");
+        assert!(
+            has_ranged,
+            "Expected at least one ranged weapon (Ruger Mini-14 or Reutech Protecta)"
+        );
 
         // Verify equipment weapon naming
-        let has_named_weapon = names.iter().any(|n| n.contains("Ruger") || n.contains("Reutech"));
-        assert!(has_named_weapon, "Expected equipment weapon names to include 'Ruger' or 'Reutech', got: {:?}", names);
+        let has_named_weapon = names
+            .iter()
+            .any(|n| n.contains("Ruger") || n.contains("Reutech"));
+        assert!(
+            has_named_weapon,
+            "Expected equipment weapon names to include 'Ruger' or 'Reutech', got: {:?}",
+            names
+        );
     }
 
     #[test]
     fn test_import_nur_sheet() {
-        let path = concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/Nur.gcs"
-        );
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/Nur.gcs");
         let json_str = std::fs::read_to_string(path).expect("Failed to read Nur GCS file");
         let actor = import_gcs_json(&json_str).expect("Failed to import Nur GCS JSON");
 
         assert_eq!(actor.name, "Nur");
-        assert!(actor.attacks.len() >= 10, "Nur should have >=10 attacks, got {}", actor.attacks.len());
+        assert!(
+            actor.attacks.len() >= 10,
+            "Nur should have >=10 attacks, got {}",
+            actor.attacks.len()
+        );
 
         let has_ranged = actor.attacks.iter().any(|a| a.is_ranged);
-        assert!(has_ranged, "Nur should have ranged weapons (Desert Eagle, Benelli M1, Alexander .50)");
+        assert!(
+            has_ranged,
+            "Nur should have ranged weapons (Desert Eagle, Benelli M1, Alexander .50)"
+        );
 
         let names: Vec<&str> = actor.attacks.iter().map(|a| a.name.as_str()).collect();
-        let has_melee = names.iter().any(|n| n.contains("Greatsword") || n.contains("Lance"));
+        let has_melee = names
+            .iter()
+            .any(|n| n.contains("Greatsword") || n.contains("Lance"));
         assert!(has_melee, "Nur should have melee weapons, got: {:?}", names);
     }
 }

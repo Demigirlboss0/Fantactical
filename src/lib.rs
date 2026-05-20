@@ -1,9 +1,9 @@
-pub mod model;
-pub mod state;
-pub mod settings;
-pub mod ui;
+pub mod client;
 pub mod logging;
-pub mod systems;
+pub mod model;
 pub mod network;
 pub mod server;
-pub mod client;
+pub mod settings;
+pub mod state;
+pub mod systems;
+pub mod ui;

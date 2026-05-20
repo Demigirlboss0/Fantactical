@@ -1,15 +1,15 @@
-use bevy::prelude::*;
-use bevy_egui::{egui, EguiContexts};
 use super::theme::apply_theme;
-use crate::model::{ActorId, ManeuverType, PainThreshold, Posture, TurnPhase};
-use crate::model::maneuver_legality::{available_maneuvers, is_directed_offensive};
 use crate::logging::LogEvent;
+use crate::model::maneuver_legality::{available_maneuvers, is_directed_offensive};
+use crate::model::{ActorId, ManeuverType, PainThreshold, Posture, TurnPhase};
+use crate::settings::SettingsResource;
 use crate::systems::phase_machine::ManeuverDeclaredEvent;
 use crate::ui::battlemap::{
-    EventLogResource, GameStateResource, GmActionEvent, ImportSheetEvent,
-    ManeuverDragState, ReloadSheetEvent, RemoveActorEvent,
+    EventLogResource, GameStateResource, GmActionEvent, ImportSheetEvent, ManeuverDragState,
+    ReloadSheetEvent, RemoveActorEvent,
 };
-use crate::settings::SettingsResource;
+use bevy::prelude::*;
+use bevy_egui::{egui, EguiContexts};
 
 pub struct PanelsPlugin;
 
@@ -30,7 +30,13 @@ struct PanelUiState {
     pending_reorder: Option<(usize, usize)>,
 }
 
-pub fn hex_under_cursor(cursor: Option<Vec2>, camera: &Transform, proj: &OrthographicProjection, hex_size: f32, window_size: Vec2) -> Option<(i32, i32)> {
+pub fn hex_under_cursor(
+    cursor: Option<Vec2>,
+    camera: &Transform,
+    proj: &OrthographicProjection,
+    hex_size: f32,
+    window_size: Vec2,
+) -> Option<(i32, i32)> {
     let cursor = cursor?;
     let world = camera.translation.truncate();
     // Camera2d has viewport centered at (0,0) — convert screen coords (top-left origin) to world coords
@@ -61,6 +67,7 @@ pub fn hex_under_cursor(cursor: Option<Vec2>, camera: &Transform, proj: &Orthogr
     Some((q, r))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn render_panels(
     mut egui_ctx: EguiContexts,
     state: Option<Res<GameStateResource>>,
@@ -82,12 +89,14 @@ fn render_panels(
 
     let current = state.as_ref().map(|s| s.history.current());
     let current_actor = current.and_then(|c| c.actors.get(&c.current_actor));
-    let phase = current.map(|c| c.current_phase).unwrap_or(TurnPhase::ManeuverSelection);
+    let phase = current
+        .map(|c| c.current_phase)
+        .unwrap_or(TurnPhase::ManeuverSelection);
     let round = current.map(|c| c.round).unwrap_or(0);
 
     let Ok(w) = window.get_single() else { return };
     let cursor_pos = w.cursor_position();
-    let win_size = Vec2::new(w.width() as f32, w.height() as f32);
+    let win_size = Vec2::new(w.width(), w.height());
     let cursor_hex = if let Ok((cam, proj)) = cameras.get_single() {
         hex_under_cursor(cursor_pos, cam, proj, 32.0, win_size)
     } else {
@@ -121,35 +130,43 @@ fn render_panels(
     }
 
     // phase + round bar at top
-    egui::TopBottomPanel::top("phase_bar").min_height(22.0).resizable(false).show(ctx, |ui| {
-        ui.horizontal(|ui| {
-            ui.label(format!("Round {}  |  Phase: {:?}  |  ", round, phase));
-            if let Some(actor) = current_actor {
-                ui.colored_label(
-                    egui::Color32::from_rgb(0x3A, 0x7B, 0xD5),
-                    format!("{}", actor.name),
-                );
-            } else {
-                ui.label("No actor");
-            }
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if let Some((q, r)) = cursor_hex {
-                    ui.label(format!("Hex ({q}, {r})"));
+    egui::TopBottomPanel::top("phase_bar")
+        .min_height(22.0)
+        .resizable(false)
+        .show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(format!("Round {}  |  Phase: {:?}  |  ", round, phase));
+                if let Some(actor) = current_actor {
+                    ui.colored_label(
+                        egui::Color32::from_rgb(0x3A, 0x7B, 0xD5),
+                        actor.name.to_string(),
+                    );
+                } else {
+                    ui.label("No actor");
                 }
-                if let Some(_state) = &state {
-                    if let Some(actor) = current_actor {
-                        let dist = crate::model::hex_distance(actor.position, cursor_hex.unwrap_or(actor.position));
-                        ui.label(format!("Range: {} yd", dist));
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if let Some((q, r)) = cursor_hex {
+                        ui.label(format!("Hex ({q}, {r})"));
                     }
-                }
+                    if let Some(_state) = &state {
+                        if let Some(actor) = current_actor {
+                            let dist = crate::model::hex_distance(
+                                actor.position,
+                                cursor_hex.unwrap_or(actor.position),
+                            );
+                            ui.label(format!("Range: {} yd", dist));
+                        }
+                    }
+                });
             });
         });
-    });
 
-    let tray_h = settings.as_ref()
+    let tray_h = settings
+        .as_ref()
         .map(|s| s.settings.maneuver_tray_height)
         .unwrap_or(190.0);
-    let log_h = settings.as_ref()
+    let log_h = settings
+        .as_ref()
         .map(|s| s.settings.event_log_height)
         .unwrap_or(120.0);
 
@@ -190,11 +207,17 @@ fn render_panels(
                                 let response = draw_maneuver_card(ui, &name, desc, color, is_armed);
 
                                 let clicked = response.clicked();
-                                let drag_started = response.drag_started_by(egui::PointerButton::Primary);
+                                let drag_started =
+                                    response.drag_started_by(egui::PointerButton::Primary);
 
                                 if clicked {
-                                    info!("Card CLICKED: {:?} (armed={}, hovered={}, rect={:?})",
-                                        m, is_armed, response.hovered(), response.rect);
+                                    info!(
+                                        "Card CLICKED: {:?} (armed={}, hovered={}, rect={:?})",
+                                        m,
+                                        is_armed,
+                                        response.hovered(),
+                                        response.rect
+                                    );
                                     if drag_state.dragging == Some(*m) {
                                         drag_state.dragging = None;
                                         info!("Deselected {:?}", m);
@@ -248,7 +271,9 @@ fn render_panels(
                 let actor_ids: Vec<ActorId> = cur.turn_order.clone();
 
                 for (index, &actor_id) in actor_ids.iter().enumerate() {
-                    let Some(actor) = cur.actors.get(&actor_id) else { continue };
+                    let Some(actor) = cur.actors.get(&actor_id) else {
+                        continue;
+                    };
                     let is_current = actor_id == cur.current_actor;
                     let is_expanded = ui_state.expanded_actor == Some(actor_id);
 
@@ -257,8 +282,16 @@ fn render_panels(
                         ref mut pending_reorder,
                         ..
                     } = *ui_state;
-                    let card_rect = draw_actor_card(ui, actor, is_current, index, actor_ids.len(),
-                        portrait_cache, pending_reorder, &cur);
+                    let card_rect = draw_actor_card(
+                        ui,
+                        actor,
+                        is_current,
+                        index,
+                        actor_ids.len(),
+                        portrait_cache,
+                        pending_reorder,
+                        cur,
+                    );
 
                     // Process reorder request
                     if let Some((from, to)) = ui_state.pending_reorder.take() {
@@ -272,7 +305,8 @@ fn render_panels(
                     if let Some(pos) = secondary_click_pos {
                         if card_rect.contains(pos) {
                             let was_expanded = ui_state.expanded_actor == Some(actor_id);
-                            ui_state.expanded_actor = if was_expanded { None } else { Some(actor_id) };
+                            ui_state.expanded_actor =
+                                if was_expanded { None } else { Some(actor_id) };
                             if !was_expanded {
                                 ui_state.just_opened_actor = Some(actor_id);
                             }
@@ -296,10 +330,11 @@ fn render_panels(
                         );
                         // Close if click outside both card and dropdown, unless just opened
                         if let Some(pos) = secondary_click_pos {
-                            if Some(actor_id) != ui_state.just_opened_actor {
-                                if !card_rect.contains(pos) && !dropdown_rect.contains(pos) {
-                                    ui_state.expanded_actor = None;
-                                }
+                            if Some(actor_id) != ui_state.just_opened_actor
+                                && !card_rect.contains(pos)
+                                && !dropdown_rect.contains(pos)
+                            {
+                                ui_state.expanded_actor = None;
                             }
                         }
                     }
@@ -314,10 +349,16 @@ fn render_panels(
                 .min_height(200.0)
                 .show_inside(ui, |ui| {
                     ui.horizontal(|ui| {
-                        if ui.selectable_label(ui_state.selected_tab == 0, "Attacks").clicked() {
+                        if ui
+                            .selectable_label(ui_state.selected_tab == 0, "Attacks")
+                            .clicked()
+                        {
                             ui_state.selected_tab = 0;
                         }
-                        if ui.selectable_label(ui_state.selected_tab == 1, "GM Config").clicked() {
+                        if ui
+                            .selectable_label(ui_state.selected_tab == 1, "GM Config")
+                            .clicked()
+                        {
                             ui_state.selected_tab = 1;
                         }
                     });
@@ -336,7 +377,9 @@ fn render_panels(
                                         atk.damage_adds,
                                         atk.damage_type,
                                         atk.skill_level,
-                                        atk.parry_bonus.map(|p| p.to_string()).unwrap_or_else(|| "—".into()),
+                                        atk.parry_bonus
+                                            .map(|p| p.to_string())
+                                            .unwrap_or_else(|| "—".into()),
                                     );
                                     ui.label(label);
                                 }
@@ -345,8 +388,8 @@ fn render_panels(
                         1 => {
                             gm_config_panel(
                                 ui,
-                                state.as_ref().map(|s| &**s),
-                                settings.as_ref().map(|v| &**v),
+                                state.as_deref(),
+                                settings.as_deref(),
                                 &mut gm_events,
                             );
                         }
@@ -371,14 +414,18 @@ fn render_panels(
                     if let Some(log_res) = &event_log {
                         for entry in log_res.log.entries.iter().rev() {
                             let color = match entry.kind {
-                                crate::model::LogEntryKind::Error => egui::Color32::from_rgb(0xCC, 0x33, 0x33),
-                                crate::model::LogEntryKind::Warning => egui::Color32::from_rgb(0xCC, 0xAA, 0x00),
+                                crate::model::LogEntryKind::Error => {
+                                    egui::Color32::from_rgb(0xCC, 0x33, 0x33)
+                                }
+                                crate::model::LogEntryKind::Warning => {
+                                    egui::Color32::from_rgb(0xCC, 0xAA, 0x00)
+                                }
                                 _ => egui::Color32::from_rgb(0x88, 0x88, 0x88),
                             };
-                            ui.colored_label(color, format!(
-                                "[R{}] {:?} | {}",
-                                entry.round, entry.kind, entry.message
-                            ));
+                            ui.colored_label(
+                                color,
+                                format!("[R{}] {:?} | {}", entry.round, entry.kind, entry.message),
+                            );
                         }
                     }
                 });
@@ -412,12 +459,14 @@ fn render_panels(
                 .fixed_pos(cursor + egui::Vec2::new(10.0, 10.0))
                 .order(egui::Order::Foreground)
                 .show(ctx, |ui| {
-                    let (rect, _) = ui.allocate_exact_size(
-                        egui::Vec2::new(card_w, card_h),
-                        egui::Sense::hover(),
-                    );
+                    let (rect, _) = ui
+                        .allocate_exact_size(egui::Vec2::new(card_w, card_h), egui::Sense::hover());
                     let painter = ui.painter_at(rect);
-                    painter.rect_filled(rect, 0.0, egui::Color32::from_rgba_premultiplied(0x16, 0x16, 0x16, 220));
+                    painter.rect_filled(
+                        rect,
+                        0.0,
+                        egui::Color32::from_rgba_premultiplied(0x16, 0x16, 0x16, 220),
+                    );
                     // Solid colored border (5px)
                     painter.rect_stroke(rect, 0.0, egui::Stroke::new(5.0, color));
 
@@ -436,7 +485,10 @@ fn render_panels(
                     // Separator line
                     let sep_y = inner.min.y + 18.0;
                     painter.line_segment(
-                        [egui::Pos2::new(inner.min.x, sep_y), egui::Pos2::new(inner.max.x, sep_y)],
+                        [
+                            egui::Pos2::new(inner.min.x, sep_y),
+                            egui::Pos2::new(inner.max.x, sep_y),
+                        ],
                         egui::Stroke::new(1.0, color.gamma_multiply(0.4)),
                     );
 
@@ -449,7 +501,11 @@ fn render_panels(
                             inner.width(),
                         )
                     });
-                    painter.galley(egui::Pos2::new(inner.min.x, sep_y + 4.0), desc_galley, egui::Color32::from_rgb(0x88, 0x88, 0x88));
+                    painter.galley(
+                        egui::Pos2::new(inner.min.x, sep_y + 4.0),
+                        desc_galley,
+                        egui::Color32::from_rgb(0x88, 0x88, 0x88),
+                    );
                 });
         }
 
@@ -464,19 +520,33 @@ fn render_panels(
                 None
             };
 
-            info!("Drop: computed hex={:?} (from pos={:?})", drop_hex, drop_pos);
+            info!(
+                "Drop: computed hex={:?} (from pos={:?})",
+                drop_hex, drop_pos
+            );
 
             if let Some(state) = &state {
                 let cur = state.history.current();
-                info!("Drop: actor positions: {:?}",
-                    cur.actors.iter().map(|(_id, a)| format!("{} @ {:?}", a.name, a.position)).collect::<Vec<_>>());
+                info!(
+                    "Drop: actor positions: {:?}",
+                    cur.actors
+                        .values()
+                        .map(|a| format!("{} @ {:?}", a.name, a.position))
+                        .collect::<Vec<_>>()
+                );
             }
 
             let target_id = if is_directed_offensive(m) {
                 drop_hex.and_then(|hex| {
                     if let Some(st) = &state {
-                        st.history.current().actors.iter()
-                            .find(|(_, a)| a.position == hex && a.id != current.map(|c| c.current_actor).unwrap_or(0))
+                        st.history
+                            .current()
+                            .actors
+                            .iter()
+                            .find(|(_, a)| {
+                                a.position == hex
+                                    && a.id != current.map(|c| c.current_actor).unwrap_or(0)
+                            })
                             .map(|(&id, _)| id)
                     } else {
                         None
@@ -487,24 +557,31 @@ fn render_panels(
             };
 
             if is_directed_offensive(m) && target_id.is_none() {
-                info!("Drop: offensive maneuver {:?} but no valid target at cursor — cancelling", m);
+                info!(
+                    "Drop: offensive maneuver {:?} but no valid target at cursor — cancelling",
+                    m
+                );
                 drag_state.dragging = None;
             } else {
                 let source_id = current.map(|c| c.current_actor).unwrap_or(0);
                 let target_name = target_id.and_then(|tid| {
-                    state.as_ref().and_then(|s| s.history.current().actors.get(&tid).map(|a| a.name.clone()))
+                    state
+                        .as_ref()
+                        .and_then(|s| s.history.current().actors.get(&tid).map(|a| a.name.clone()))
                 });
 
-            info!("Drop resolved: source={}, target={:?} ({:?}), maneuver={:?}",
-                source_id, target_id, target_name, m);
+                info!(
+                    "Drop resolved: source={}, target={:?} ({:?}), maneuver={:?}",
+                    source_id, target_id, target_name, m
+                );
 
-            maneuver_declared.send(ManeuverDeclaredEvent {
-                source_id,
-                target_id,
-                target_hex: drop_hex,
-                maneuver: m,
-                extra_efforts: vec![],
-            });
+                maneuver_declared.send(ManeuverDeclaredEvent {
+                    source_id,
+                    target_id,
+                    target_hex: drop_hex,
+                    maneuver: m,
+                    extra_efforts: vec![],
+                });
                 drag_state.dragging = None;
                 info!("Drag cleared after drop");
             }
@@ -531,7 +608,10 @@ fn draw_actor_dropdown(
         ui.horizontal(|ui| {
             if let Some(ref path) = actor.source_path {
                 if ui.button("Reload Sheet").clicked() {
-                    reload_events.send(ReloadSheetEvent { actor_id: actor.id, path: path.clone() });
+                    reload_events.send(ReloadSheetEvent {
+                        actor_id: actor.id,
+                        path: path.clone(),
+                    });
                     *expanded_actor = None;
                 }
             } else {
@@ -548,8 +628,12 @@ fn draw_actor_dropdown(
         ui.label("Change Posture:");
         ui.horizontal(|ui| {
             let postures = [
-                Posture::Standing, Posture::Kneeling, Posture::Crouching,
-                Posture::Sitting, Posture::Prone, Posture::Crawling,
+                Posture::Standing,
+                Posture::Kneeling,
+                Posture::Crouching,
+                Posture::Sitting,
+                Posture::Prone,
+                Posture::Crawling,
             ];
             for p in &postures {
                 if actor.posture == *p {
@@ -628,15 +712,26 @@ fn gm_config_panel(
                 });
             }
             if let Some(idx) = to_remove {
-                gm_events.send(GmActionEvent::RemoveModifier { index: idx, actor_id: None });
+                gm_events.send(GmActionEvent::RemoveModifier {
+                    index: idx,
+                    actor_id: None,
+                });
             }
         }
 
         ui.separator();
         ui.label("Add Modifier:");
         ui.horizontal(|ui| {
-            ui.add(egui::TextEdit::singleline(&mut new_mod_label).hint_text("label").desired_width(100.0));
-            ui.add(egui::DragValue::new(&mut new_mod_value).range(-10..=10).speed(1));
+            ui.add(
+                egui::TextEdit::singleline(&mut new_mod_label)
+                    .hint_text("label")
+                    .desired_width(100.0),
+            );
+            ui.add(
+                egui::DragValue::new(&mut new_mod_value)
+                    .range(-10..=10)
+                    .speed(1),
+            );
             if ui.button("Add").clicked() && !new_mod_label.is_empty() {
                 gm_events.send(GmActionEvent::AddModifier {
                     label: new_mod_label.clone(),
@@ -683,19 +778,28 @@ fn gm_config_panel(
             egui::ComboBox::from_label("Pain Threshold")
                 .selected_text(format!("{:?}", current_pt))
                 .show_ui(ui, |ui| {
-                    if ui.selectable_label(current_pt == PainThreshold::Normal, "Normal").clicked() {
+                    if ui
+                        .selectable_label(current_pt == PainThreshold::Normal, "Normal")
+                        .clicked()
+                    {
                         gm_events.send(GmActionEvent::PainThreshold {
                             actor_id: current.current_actor,
                             threshold: PainThreshold::Normal,
                         });
                     }
-                    if ui.selectable_label(current_pt == PainThreshold::High, "High").clicked() {
+                    if ui
+                        .selectable_label(current_pt == PainThreshold::High, "High")
+                        .clicked()
+                    {
                         gm_events.send(GmActionEvent::PainThreshold {
                             actor_id: current.current_actor,
                             threshold: PainThreshold::High,
                         });
                     }
-                    if ui.selectable_label(current_pt == PainThreshold::Low, "Low").clicked() {
+                    if ui
+                        .selectable_label(current_pt == PainThreshold::Low, "Low")
+                        .clicked()
+                    {
                         gm_events.send(GmActionEvent::PainThreshold {
                             actor_id: current.current_actor,
                             threshold: PainThreshold::Low,
@@ -732,6 +836,7 @@ fn gm_config_panel(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn draw_actor_card(
     ui: &mut egui::Ui,
     actor: &crate::model::Actor,
@@ -746,7 +851,8 @@ fn draw_actor_card(
     let fp_ratio = actor.fp_current as f32 / actor.fp_max.max(1) as f32;
 
     let frame = if is_current {
-        egui::Frame::group(ui.style()).fill(egui::Color32::from_rgba_premultiplied(0x3A, 0x7B, 0xD5, 40))
+        egui::Frame::group(ui.style())
+            .fill(egui::Color32::from_rgba_premultiplied(0x3A, 0x7B, 0xD5, 40))
     } else {
         egui::Frame::group(ui.style())
     };
@@ -757,7 +863,9 @@ fn draw_actor_card(
 
             if let Some(img_data) = &actor.portrait_data {
                 if let Some(tex) = portrait_cache.get(&actor.name) {
-                    ui.add(egui::Image::new(tex).fit_to_exact_size(egui::Vec2::splat(portrait_size)));
+                    ui.add(
+                        egui::Image::new(tex).fit_to_exact_size(egui::Vec2::splat(portrait_size)),
+                    );
                 } else if let Ok(dyn_img) = image::load_from_memory(img_data) {
                     let rgba = dyn_img.to_rgba8();
                     let size = [rgba.width() as _, rgba.height() as _];
@@ -768,7 +876,9 @@ fn draw_actor_card(
                         egui::TextureOptions::default(),
                     );
                     portrait_cache.insert(actor.name.clone(), tex.clone());
-                    ui.add(egui::Image::new(&tex).fit_to_exact_size(egui::Vec2::splat(portrait_size)));
+                    ui.add(
+                        egui::Image::new(&tex).fit_to_exact_size(egui::Vec2::splat(portrait_size)),
+                    );
                 } else {
                     draw_portrait_placeholder(ui, actor, portrait_size);
                 }
@@ -814,12 +924,16 @@ fn draw_actor_card(
         ));
         ui.label(format!(
             "Spd {:.2}  Move {}   SM {}",
-            actor.basic_speed, actor.effective_move(), actor.sm
+            actor.basic_speed,
+            actor.effective_move(),
+            actor.sm
         ));
         ui.label(format!(
             "Dodge {}  Parry {}",
             actor.dodge(),
-            actor.attacks.first()
+            actor
+                .attacks
+                .first()
                 .and_then(|a| a.parry_bonus)
                 .map(|p| p.to_string())
                 .unwrap_or_else(|| "—".into())
@@ -855,17 +969,26 @@ fn draw_actor_card(
         }
 
         let mut flags = Vec::new();
-        if actor.flags.stunned { flags.push("Stunned"); }
-        if actor.flags.knocked_down { flags.push("Knocked Down"); }
-        if actor.flags.unconscious { flags.push("Unconscious"); }
-        if actor.flags.dead { flags.push("Dead"); }
-        if actor.one_leg_crippled() { flags.push("Crippled Leg"); }
-        if actor.both_legs_crippled() { flags.push("Both Legs Crippled"); }
+        if actor.flags.stunned {
+            flags.push("Stunned");
+        }
+        if actor.flags.knocked_down {
+            flags.push("Knocked Down");
+        }
+        if actor.flags.unconscious {
+            flags.push("Unconscious");
+        }
+        if actor.flags.dead {
+            flags.push("Dead");
+        }
+        if actor.one_leg_crippled() {
+            flags.push("Crippled Leg");
+        }
+        if actor.both_legs_crippled() {
+            flags.push("Both Legs Crippled");
+        }
         if !flags.is_empty() {
-            ui.colored_label(
-                egui::Color32::from_rgb(0xCC, 0x33, 0x33),
-                flags.join(" | "),
-            );
+            ui.colored_label(egui::Color32::from_rgb(0xCC, 0x33, 0x33), flags.join(" | "));
         }
     });
 
@@ -875,12 +998,24 @@ fn draw_actor_card(
 fn draw_portrait_placeholder(ui: &mut egui::Ui, actor: &crate::model::Actor, size: f32) {
     let (rect, _) = ui.allocate_exact_size(egui::Vec2::splat(size), egui::Sense::hover());
     let painter = ui.painter_at(rect);
-    painter.circle_filled(rect.center(), size / 2.0, egui::Color32::from_rgb(0x3A, 0x7B, 0xD5));
-    let initials = actor.name.split_whitespace()
+    painter.circle_filled(
+        rect.center(),
+        size / 2.0,
+        egui::Color32::from_rgb(0x3A, 0x7B, 0xD5),
+    );
+    let initials = actor
+        .name
+        .split_whitespace()
         .filter_map(|w| w.chars().next())
         .take(2)
         .collect::<String>();
-    painter.text(rect.center(), egui::Align2::CENTER_CENTER, initials, egui::FontId::proportional(12.0), egui::Color32::WHITE);
+    painter.text(
+        rect.center(),
+        egui::Align2::CENTER_CENTER,
+        initials,
+        egui::FontId::proportional(12.0),
+        egui::Color32::WHITE,
+    );
 }
 
 fn draw_stat_bar(ui: &mut egui::Ui, label: &str, ratio: f32, current: i16, max: i16) {
@@ -893,7 +1028,7 @@ fn draw_stat_bar(ui: &mut egui::Ui, label: &str, ratio: f32, current: i16, max: 
         egui::Color32::from_rgb(0x44, 0xAA, 0x44)
     };
     ui.horizontal(|ui| {
-        ui.label(format!("{label}"));
+        ui.label(label.to_string());
         let bar = egui::widgets::ProgressBar::new(ratio.max(0.0))
             .desired_width(ui.available_width() - 60.0)
             .fill(color)
@@ -905,21 +1040,28 @@ fn draw_stat_bar(ui: &mut egui::Ui, label: &str, ratio: f32, current: i16, max: 
 fn maneuver_category_color_egui(maneuver: ManeuverType) -> egui::Color32 {
     use ManeuverType as Mt;
     match maneuver {
-        Mt::Attack | Mt::Feint | Mt::FeignBeat | Mt::FeignDefensive | Mt::FeignRuse | Mt::Evaluate => {
-            egui::Color32::from_rgb(0xCC, 0x33, 0x33)
-        }
-        Mt::AllOutAttackDetermined | Mt::AllOutAttackDouble | Mt::AllOutAttackFeint
-        | Mt::AllOutAttackLong | Mt::AllOutAttackStrong | Mt::AllOutAttackRangedDetermined
-        | Mt::CommittedAttackDetermined | Mt::CommittedAttackStrong => {
-            egui::Color32::from_rgb(0xFF, 0x66, 0x00)
-        }
+        Mt::Attack
+        | Mt::Feint
+        | Mt::FeignBeat
+        | Mt::FeignDefensive
+        | Mt::FeignRuse
+        | Mt::Evaluate => egui::Color32::from_rgb(0xCC, 0x33, 0x33),
+        Mt::AllOutAttackDetermined
+        | Mt::AllOutAttackDouble
+        | Mt::AllOutAttackFeint
+        | Mt::AllOutAttackLong
+        | Mt::AllOutAttackStrong
+        | Mt::AllOutAttackRangedDetermined
+        | Mt::CommittedAttackDetermined
+        | Mt::CommittedAttackStrong => egui::Color32::from_rgb(0xFF, 0x66, 0x00),
         Mt::Aim | Mt::Move | Mt::MoveAndAttack | Mt::ChangePosture => {
             egui::Color32::from_rgb(0xCC, 0xAA, 0x00)
         }
-        Mt::AllOutDefenseIncreased | Mt::AllOutDefenseDouble | Mt::AllOutDefenseMental
-        | Mt::DefensiveAttack | Mt::Ready => {
-            egui::Color32::from_rgb(0x33, 0x66, 0x99)
-        }
+        Mt::AllOutDefenseIncreased
+        | Mt::AllOutDefenseDouble
+        | Mt::AllOutDefenseMental
+        | Mt::DefensiveAttack
+        | Mt::Ready => egui::Color32::from_rgb(0x33, 0x66, 0x99),
         Mt::Concentrate | Mt::AllOutConcentrate | Mt::DoNothing | Mt::Wait => {
             egui::Color32::from_rgb(0x77, 0x55, 0xAA)
         }
@@ -952,7 +1094,11 @@ fn draw_maneuver_card(
 
     // Card background
     if dragged {
-        painter.rect_filled(rect, 0.0, egui::Color32::from_rgba_premultiplied(0x16, 0x16, 0x16, 150));
+        painter.rect_filled(
+            rect,
+            0.0,
+            egui::Color32::from_rgba_premultiplied(0x16, 0x16, 0x16, 150),
+        );
     } else {
         painter.rect_filled(rect, 0.0, bg);
     }
@@ -978,7 +1124,10 @@ fn draw_maneuver_card(
     // Separator line below name
     let sep_y = name_pos.y + 18.0;
     painter.line_segment(
-        [egui::Pos2::new(inner.min.x, sep_y), egui::Pos2::new(inner.max.x, sep_y)],
+        [
+            egui::Pos2::new(inner.min.x, sep_y),
+            egui::Pos2::new(inner.max.x, sep_y),
+        ],
         egui::Stroke::new(1.0, color.gamma_multiply(0.4)),
     );
 
@@ -992,7 +1141,11 @@ fn draw_maneuver_card(
             inner.width(),
         )
     });
-    painter.galley(desc_pos, desc_galley, egui::Color32::from_rgb(0x88, 0x88, 0x88));
+    painter.galley(
+        desc_pos,
+        desc_galley,
+        egui::Color32::from_rgb(0x88, 0x88, 0x88),
+    );
 
     response
 }

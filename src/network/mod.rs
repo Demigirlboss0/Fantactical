@@ -1,5 +1,5 @@
+use crate::model::{ActorId, ExtraEffort, LogEntry, ManeuverType, PainThreshold, Posture};
 use serde::{Deserialize, Serialize};
-use crate::model::{ActorId, GameState, LogEntry, ManeuverType, ExtraEffort, PainThreshold, Posture};
 
 pub const DEFAULT_PORT: u16 = 9002;
 
@@ -94,12 +94,14 @@ mod tests {
     use super::*;
     use crate::model::GameStateHistory;
     use crate::model::{
-        GameState, TurnPhase, Actor, StatusFlags, LegState, PainThreshold, Posture,
-        Encumbrance, LogEntry, LogEntryKind, ManeuverType, ExtraEffort,
+        Actor, Encumbrance, ExtraEffort, GameState, LegState, LogEntry, LogEntryKind, ManeuverType,
+        PainThreshold, Posture, StatusFlags, TurnPhase,
     };
     use std::collections::HashMap;
 
-    fn roundtrip<T: serde::Serialize + serde::de::DeserializeOwned + std::fmt::Debug + PartialEq>(
+    fn roundtrip<
+        T: serde::Serialize + serde::de::DeserializeOwned + std::fmt::Debug + PartialEq,
+    >(
         val: &T,
     ) {
         let json = serde_json::to_string(val).expect("serialize");
@@ -116,7 +118,9 @@ mod tests {
 
     #[test]
     fn test_client_message_auth() {
-        roundtrip(&ClientMessage::Auth { token: "secret123".into() });
+        roundtrip(&ClientMessage::Auth {
+            token: "secret123".into(),
+        });
     }
 
     #[test]
@@ -240,18 +244,29 @@ mod tests {
 
     #[test]
     fn test_server_message_auth_success() {
-        roundtrip(&ServerMessage::AuthSuccess { client_id: 1, is_gm: true });
-        roundtrip(&ServerMessage::AuthSuccess { client_id: 2, is_gm: false });
+        roundtrip(&ServerMessage::AuthSuccess {
+            client_id: 1,
+            is_gm: true,
+        });
+        roundtrip(&ServerMessage::AuthSuccess {
+            client_id: 2,
+            is_gm: false,
+        });
     }
 
     #[test]
     fn test_server_message_auth_failure() {
-        roundtrip(&ServerMessage::AuthFailure { reason: "Bad token".into() });
+        roundtrip(&ServerMessage::AuthFailure {
+            reason: "Bad token".into(),
+        });
     }
 
     #[test]
     fn test_server_message_roll_result() {
-        roundtrip(&ServerMessage::RollResult { label: "Attack roll: 12".into(), roll: 12 });
+        roundtrip(&ServerMessage::RollResult {
+            label: "Attack roll: 12".into(),
+            roll: 12,
+        });
     }
 
     #[test]
@@ -268,30 +283,63 @@ mod tests {
 
     #[test]
     fn test_server_message_actor_ownership() {
-        roundtrip(&ServerMessage::ActorOwnership { actor_ids: vec![1, 2, 3] });
+        roundtrip(&ServerMessage::ActorOwnership {
+            actor_ids: vec![1, 2, 3],
+        });
         roundtrip(&ServerMessage::ActorOwnership { actor_ids: vec![] });
     }
 
     #[test]
     fn test_server_message_error() {
-        roundtrip(&ServerMessage::Error { message: "Invalid maneuver".into() });
+        roundtrip(&ServerMessage::Error {
+            message: "Invalid maneuver".into(),
+        });
     }
 
     #[test]
     fn test_server_message_state_snapshot() {
         let mut actors = HashMap::new();
-        actors.insert(1, Actor {
-            id: 1, name: "Test".into(), portrait_path: None, portrait_data: None,
-            source_path: None, is_npc: false, st: 10, dx: 10, iq: 10, ht: 10,
-            hp_max: 10, fp_max: 10, basic_speed: 5.0, basic_move: 5,
-            will: 10, per: 10, attacks: vec![], skills: vec![], armor: vec![],
-            sm: 0, is_male: true, position: (0, 0), hp_current: 10, fp_current: 10,
-            posture: Posture::Standing, encumbrance: Encumbrance::None,
-            flags: StatusFlags::default(), leg_state: LegState::default(),
-            individual_modifiers: vec![], pain_threshold: PainThreshold::Normal,
-            turns_per_round: 1, attacks_per_turn: 1, enhanced_time_sense: false,
-            current_maneuver: None, active_attack: None, extra_effort: vec![],
-        });
+        actors.insert(
+            1,
+            Actor {
+                id: 1,
+                name: "Test".into(),
+                portrait_path: None,
+                portrait_data: None,
+                source_path: None,
+                is_npc: false,
+                st: 10,
+                dx: 10,
+                iq: 10,
+                ht: 10,
+                hp_max: 10,
+                fp_max: 10,
+                basic_speed: 5.0,
+                basic_move: 5,
+                will: 10,
+                per: 10,
+                attacks: vec![],
+                skills: vec![],
+                armor: vec![],
+                sm: 0,
+                is_male: true,
+                position: (0, 0),
+                hp_current: 10,
+                fp_current: 10,
+                posture: Posture::Standing,
+                encumbrance: Encumbrance::None,
+                flags: StatusFlags::default(),
+                leg_state: LegState::default(),
+                individual_modifiers: vec![],
+                pain_threshold: PainThreshold::Normal,
+                turns_per_round: 1,
+                attacks_per_turn: 1,
+                enhanced_time_sense: false,
+                current_maneuver: None,
+                active_attack: None,
+                extra_effort: vec![],
+            },
+        );
         let state = GameState {
             actors,
             relations: vec![],

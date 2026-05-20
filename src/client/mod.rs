@@ -1,18 +1,22 @@
+use futures_util::stream::SplitSink;
+use futures_util::{SinkExt, StreamExt};
 use log;
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::Message;
-use futures_util::{SinkExt, StreamExt};
-use futures_util::stream::SplitSink;
-use tokio_tungstenite::WebSocketStream;
 use tokio_tungstenite::MaybeTlsStream;
+use tokio_tungstenite::WebSocketStream;
 
 use crate::network::{ClientMessage, ServerMessage};
 
 #[derive(Debug, Clone)]
 pub enum ClientOutgoing {
-    Connect { host: String, port: u16, token: String },
+    Connect {
+        host: String,
+        port: u16,
+        token: String,
+    },
     Disconnect,
     Send(ClientMessage),
 }
@@ -25,8 +29,7 @@ pub enum ClientIncoming {
     Status(String),
 }
 
-pub fn spawn_client(
-) -> (
+pub fn spawn_client() -> (
     mpsc::UnboundedSender<ClientOutgoing>,
     mpsc::UnboundedReceiver<ClientIncoming>,
 ) {
@@ -36,7 +39,8 @@ pub fn spawn_client(
     let incoming = incoming_tx.clone();
 
     tokio::spawn(async move {
-        let mut sender: Option<SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>> = None;
+        let mut sender: Option<SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>> =
+            None;
         let mut backoff_secs: u64 = 1;
 
         loop {
@@ -135,7 +139,8 @@ pub fn spawn_client(
 
             // If we get here, connection was lost — try reconnect
             let _ = incoming.send(ClientIncoming::Status(format!(
-                "Reconnecting in {}s...", backoff_secs
+                "Reconnecting in {}s...",
+                backoff_secs
             )));
             tokio::time::sleep(tokio::time::Duration::from_secs(backoff_secs)).await;
             backoff_secs = (backoff_secs * 2).min(30);
@@ -177,10 +182,15 @@ mod tests {
 
     #[test]
     fn test_client_incoming_variants() {
-        let connected = ClientIncoming::Connected { client_id: 1, is_gm: true };
+        let connected = ClientIncoming::Connected {
+            client_id: 1,
+            is_gm: true,
+        };
         assert!(matches!(connected, ClientIncoming::Connected { .. }));
 
-        let disconnected = ClientIncoming::Disconnected { reason: "timeout".into() };
+        let disconnected = ClientIncoming::Disconnected {
+            reason: "timeout".into(),
+        };
         assert!(matches!(disconnected, ClientIncoming::Disconnected { .. }));
 
         let status = ClientIncoming::Status("reconnecting".into());

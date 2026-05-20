@@ -1,12 +1,12 @@
-use bevy::prelude::*;
-use bevy_egui::{egui, EguiContexts};
-use crate::model::{HitLocation, TurnPhase};
 use crate::model::rolls::roll_3d6;
+use crate::model::{HitLocation, TurnPhase};
 use crate::systems::phase_machine::{
     AttackSetupConfirmedEvent, CancelPhaseEvent, DefenseSelectedEvent, DefenseType, ModalState,
     PhaseAdvanceEvent, RollRequestedEvent,
 };
 use crate::ui::battlemap::GameStateResource;
+use bevy::prelude::*;
+use bevy_egui::{egui, EguiContexts};
 
 pub struct RollModalPlugin;
 
@@ -16,6 +16,7 @@ impl Plugin for RollModalPlugin {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn render_roll_modal(
     mut egui_ctx: EguiContexts,
     state: Option<Res<GameStateResource>>,
@@ -48,23 +49,30 @@ fn render_roll_modal(
         .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
         .collapsible(false)
         .resizable(false)
-        .show(ctx, |ui| {
-            match phase {
-                TurnPhase::AttackSetup => render_attack_setup(
-                    ui, &current, &mut modal, &mut attack_events, &mut cancel_events,
-                ),
-                TurnPhase::ManeuverConfirmed => render_maneuver_confirmed(
-                    ui, &mut modal, &mut advance_events, &mut cancel_events,
-                ),
-                TurnPhase::AttackRoll => render_attack_roll(
-                    ui, &mut modal, &mut roll_events, &mut cancel_events,
-                ),
-                TurnPhase::DefenseResolution => render_defense_resolution(
-                    ui, &current, &mut modal, &mut defense_events, &mut advance_events, &mut cancel_events,
-                ),
-                _ => {
-                    ui.label(format!("Phase: {:?}", phase));
-                }
+        .show(ctx, |ui| match phase {
+            TurnPhase::AttackSetup => render_attack_setup(
+                ui,
+                current,
+                &mut modal,
+                &mut attack_events,
+                &mut cancel_events,
+            ),
+            TurnPhase::ManeuverConfirmed => {
+                render_maneuver_confirmed(ui, &mut modal, &mut advance_events, &mut cancel_events)
+            }
+            TurnPhase::AttackRoll => {
+                render_attack_roll(ui, &mut modal, &mut roll_events, &mut cancel_events)
+            }
+            TurnPhase::DefenseResolution => render_defense_resolution(
+                ui,
+                current,
+                &mut modal,
+                &mut defense_events,
+                &mut advance_events,
+                &mut cancel_events,
+            ),
+            _ => {
+                ui.label(format!("Phase: {:?}", phase));
             }
         });
 }
@@ -91,13 +99,25 @@ fn render_attack_setup(
         return;
     }
 
-    let attack_names: Vec<String> = attacker.attacks.iter().map(|a| {
-        format!("{} ({}d{:+} {:?}, lvl {})", a.name, a.damage_dice, a.damage_adds, a.damage_type, a.skill_level)
-    }).collect();
+    let attack_names: Vec<String> = attacker
+        .attacks
+        .iter()
+        .map(|a| {
+            format!(
+                "{} ({}d{:+} {:?}, lvl {})",
+                a.name, a.damage_dice, a.damage_adds, a.damage_type, a.skill_level
+            )
+        })
+        .collect();
 
     ui.label("Attack:");
     egui::ComboBox::from_id_salt("attack_selector")
-        .selected_text(&attack_names.get(modal.attack_index).cloned().unwrap_or_default())
+        .selected_text(
+            attack_names
+                .get(modal.attack_index)
+                .cloned()
+                .unwrap_or_default(),
+        )
         .show_ui(ui, |ui| {
             for (i, name) in attack_names.iter().enumerate() {
                 if ui.selectable_label(modal.attack_index == i, name).clicked() {
@@ -112,7 +132,11 @@ fn render_attack_setup(
         .map(|l| format!("{:?} ({})", l, l.to_hit_penalty()))
         .collect();
 
-    let current_loc_name = format!("{:?} ({})", modal.hit_location, modal.hit_location.to_hit_penalty());
+    let current_loc_name = format!(
+        "{:?} ({})",
+        modal.hit_location,
+        modal.hit_location.to_hit_penalty()
+    );
 
     ui.label("Target Hit Location:");
     egui::ComboBox::from_id_salt("loc_selector")
@@ -133,8 +157,14 @@ fn render_attack_setup(
     let target_id = modal.target_id_for_modal.unwrap_or(attacker_id);
 
     ui.separator();
-    ui.label(format!("Target: {}", current.actors.get(&target_id)
-        .map(|a| a.name.as_str()).unwrap_or("unknown")));
+    ui.label(format!(
+        "Target: {}",
+        current
+            .actors
+            .get(&target_id)
+            .map(|a| a.name.as_str())
+            .unwrap_or("unknown")
+    ));
 
     ui.separator();
     if ui.button("Confirm Attack Setup").clicked() {
@@ -247,8 +277,11 @@ fn render_defense_resolution(
         let label = match dt {
             DefenseType::Dodge => format!("Dodge ({})", val),
             DefenseType::Parry { attack_index } => {
-                let name = defender.attacks.get(*attack_index)
-                    .map(|a| a.name.as_str()).unwrap_or("?");
+                let name = defender
+                    .attacks
+                    .get(*attack_index)
+                    .map(|a| a.name.as_str())
+                    .unwrap_or("?");
                 format!("Parry ({}) — {}", val, name)
             }
             DefenseType::Block { attack_index: _ } => format!("Block ({})", val),

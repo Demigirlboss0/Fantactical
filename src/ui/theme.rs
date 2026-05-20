@@ -1,5 +1,5 @@
-use bevy_egui::EguiContexts;
 use crate::model::{MilSimTheme, Theme};
+use bevy_egui::EguiContexts;
 
 pub fn apply_theme(mut egui_ctx: EguiContexts) {
     let theme = MilSimTheme;
@@ -9,7 +9,8 @@ pub fn apply_theme(mut egui_ctx: EguiContexts) {
     let mut style = (*ctx.style()).clone();
 
     style.visuals.dark_mode = true;
-    style.visuals.window_rounding = bevy_egui::egui::Rounding::same(theme.typography().panel_corner_radius);
+    style.visuals.window_rounding =
+        bevy_egui::egui::Rounding::same(theme.typography().panel_corner_radius);
     style.visuals.window_shadow = bevy_egui::egui::epaint::Shadow::NONE;
 
     let panel = bevy_egui::egui::Color32::from_rgb(

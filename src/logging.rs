@@ -1,6 +1,6 @@
-use bevy::prelude::*;
 use crate::model::{LogEntry, LogEntryKind, TurnPhase};
 use crate::ui::battlemap::EventLogResource;
+use bevy::prelude::*;
 
 #[derive(Event, Debug, Clone)]
 pub struct LogEvent {

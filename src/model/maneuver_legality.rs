@@ -1,6 +1,6 @@
 use super::*;
-use ManeuverType as Mt;
 use ExtraEffort as Ee;
+use ManeuverType as Mt;
 
 pub fn available_maneuvers(actor: &Actor) -> Vec<Mt> {
     if actor.flags.dead {
@@ -42,7 +42,12 @@ pub fn available_maneuvers(actor: &Actor) -> Vec<Mt> {
     }
 
     if maneuvers.contains(&Mt::Feint) && !has_melee_skill(actor) {
-        maneuvers.retain(|m| !matches!(*m, Mt::Feint | Mt::FeignBeat | Mt::FeignDefensive | Mt::FeignRuse));
+        maneuvers.retain(|m| {
+            !matches!(
+                *m,
+                Mt::Feint | Mt::FeignBeat | Mt::FeignDefensive | Mt::FeignRuse
+            )
+        });
     }
 
     if !has_shield(actor) {
@@ -64,72 +69,69 @@ fn posture_maneuvers(posture: Posture) -> Vec<Mt> {
             m
         }
 
-        Posture::Sitting => {
-            all.into_iter()
-                .filter(|x| {
-                    !matches!(
-                        *x,
-                        Mt::Move
-                            | Mt::MoveAndAttack
-                            | Mt::AllOutAttackDetermined
-                            | Mt::AllOutAttackDouble
-                            | Mt::AllOutAttackFeint
-                            | Mt::AllOutAttackLong
-                            | Mt::AllOutAttackStrong
-                            | Mt::AllOutAttackRangedDetermined
-                            | Mt::CommittedAttackDetermined
-                            | Mt::CommittedAttackStrong
-                    )
-                })
-                .collect()
-        }
+        Posture::Sitting => all
+            .into_iter()
+            .filter(|x| {
+                !matches!(
+                    *x,
+                    Mt::Move
+                        | Mt::MoveAndAttack
+                        | Mt::AllOutAttackDetermined
+                        | Mt::AllOutAttackDouble
+                        | Mt::AllOutAttackFeint
+                        | Mt::AllOutAttackLong
+                        | Mt::AllOutAttackStrong
+                        | Mt::AllOutAttackRangedDetermined
+                        | Mt::CommittedAttackDetermined
+                        | Mt::CommittedAttackStrong
+                )
+            })
+            .collect(),
 
-        Posture::Prone => {
-            all.into_iter()
-                .filter(|x| {
-                    !matches!(
-                        *x,
-                        Mt::Move
-                            | Mt::MoveAndAttack
-                            | Mt::AllOutAttackDetermined
-                            | Mt::AllOutAttackDouble
-                            | Mt::AllOutAttackFeint
-                            | Mt::AllOutAttackLong
-                            | Mt::AllOutAttackStrong
-                            | Mt::CommittedAttackDetermined
-                            | Mt::CommittedAttackStrong
-                            | Mt::DefensiveAttack
-                            | Mt::Feint
-                            | Mt::FeignBeat
-                            | Mt::FeignDefensive
-                            | Mt::FeignRuse
-                    )
-                })
-                .collect()
-        }
+        Posture::Prone => all
+            .into_iter()
+            .filter(|x| {
+                !matches!(
+                    *x,
+                    Mt::Move
+                        | Mt::MoveAndAttack
+                        | Mt::AllOutAttackDetermined
+                        | Mt::AllOutAttackDouble
+                        | Mt::AllOutAttackFeint
+                        | Mt::AllOutAttackLong
+                        | Mt::AllOutAttackStrong
+                        | Mt::CommittedAttackDetermined
+                        | Mt::CommittedAttackStrong
+                        | Mt::DefensiveAttack
+                        | Mt::Feint
+                        | Mt::FeignBeat
+                        | Mt::FeignDefensive
+                        | Mt::FeignRuse
+                )
+            })
+            .collect(),
 
-        Posture::Crawling => {
-            all.into_iter()
-                .filter(|x| {
-                    !matches!(
-                        *x,
-                        Mt::MoveAndAttack
-                            | Mt::AllOutAttackDetermined
-                            | Mt::AllOutAttackDouble
-                            | Mt::AllOutAttackFeint
-                            | Mt::AllOutAttackLong
-                            | Mt::AllOutAttackStrong
-                            | Mt::CommittedAttackDetermined
-                            | Mt::CommittedAttackStrong
-                            | Mt::DefensiveAttack
-                            | Mt::Feint
-                            | Mt::FeignBeat
-                            | Mt::FeignDefensive
-                            | Mt::FeignRuse
-                    )
-                })
-                .collect()
-        }
+        Posture::Crawling => all
+            .into_iter()
+            .filter(|x| {
+                !matches!(
+                    *x,
+                    Mt::MoveAndAttack
+                        | Mt::AllOutAttackDetermined
+                        | Mt::AllOutAttackDouble
+                        | Mt::AllOutAttackFeint
+                        | Mt::AllOutAttackLong
+                        | Mt::AllOutAttackStrong
+                        | Mt::CommittedAttackDetermined
+                        | Mt::CommittedAttackStrong
+                        | Mt::DefensiveAttack
+                        | Mt::Feint
+                        | Mt::FeignBeat
+                        | Mt::FeignDefensive
+                        | Mt::FeignRuse
+                )
+            })
+            .collect(),
     }
 }
 
@@ -199,12 +201,20 @@ fn has_melee_skill(actor: &Actor) -> bool {
 }
 
 fn has_shield(actor: &Actor) -> bool {
-    actor.armor.iter().any(|a| a.name.to_lowercase().contains("shield"))
+    actor
+        .armor
+        .iter()
+        .any(|a| a.name.to_lowercase().contains("shield"))
 }
 
 pub fn combo_whitelist(maneuver: Mt) -> Vec<Ee> {
     match maneuver {
-        Mt::Attack => vec![Ee::MightyBlow, Ee::RapidStrike, Ee::FlurryOfBlows, Ee::GreatLunge],
+        Mt::Attack => vec![
+            Ee::MightyBlow,
+            Ee::RapidStrike,
+            Ee::FlurryOfBlows,
+            Ee::GreatLunge,
+        ],
         Mt::AllOutAttackDetermined
         | Mt::AllOutAttackDouble
         | Mt::AllOutAttackFeint
@@ -464,7 +474,10 @@ mod tests {
             rcl: Some(2),
         }];
         let m = available_maneuvers(&actor);
-        assert!(!m.contains(&Mt::Feint), "Feint should not be available without a melee skill");
+        assert!(
+            !m.contains(&Mt::Feint),
+            "Feint should not be available without a melee skill"
+        );
         assert!(!m.contains(&Mt::FeignBeat));
         assert!(!m.contains(&Mt::FeignDefensive));
         assert!(!m.contains(&Mt::FeignRuse));

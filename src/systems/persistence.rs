@@ -1,6 +1,6 @@
-use bevy::prelude::*;
 use crate::state::history;
 use crate::ui::battlemap::GameStateResource;
+use bevy::prelude::*;
 
 pub struct PersistencePlugin;
 
@@ -37,7 +37,10 @@ fn auto_save_on_round_change(
         let dir = std::path::Path::new(&ps.output_dir);
         let path = history::save_file_path(&ps.session_name, ps.last_saved_round, dir);
         if let Err(e) = history::save_history(history, &path) {
-            error!("Failed to save history for round {}: {e}", ps.last_saved_round);
+            error!(
+                "Failed to save history for round {}: {e}",
+                ps.last_saved_round
+            );
         } else {
             info!("Saved: {}", path.display());
         }

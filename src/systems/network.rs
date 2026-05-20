@@ -3,7 +3,7 @@ use tokio::sync::mpsc;
 
 use crate::client::{spawn_client, ClientIncoming, ClientOutgoing};
 use crate::network::ServerMessage;
-use crate::server::{ServerIncoming, ServerOutgoing, ServerConfig};
+use crate::server::{ServerConfig, ServerIncoming, ServerOutgoing};
 use crate::ui::battlemap::GameStateResource;
 
 pub struct NetworkPlugin {
@@ -47,7 +47,7 @@ impl Plugin for NetworkPlugin {
                 app.insert_resource(NetworkRole::Client);
 
                 if let Some(ref host) = self.connect_host {
-                    if let Some(ref channels) = app.world().get_resource::<NetworkChannels>() {
+                    if let Some(channels) = app.world().get_resource::<NetworkChannels>() {
                         if let Some(ref co) = channels.client_outgoing {
                             let _ = co.send(ClientOutgoing::Connect {
                                 host: host.clone(),
@@ -118,7 +118,11 @@ fn process_network_incoming(
                     info!("{}", net_state.status);
                 }
                 ServerIncoming::Message { client_id, message } => {
-                    info!("Message from client {}: {:?}", client_id, std::mem::discriminant(&message));
+                    info!(
+                        "Message from client {}: {:?}",
+                        client_id,
+                        std::mem::discriminant(&message)
+                    );
                 }
             }
         }
@@ -131,8 +135,11 @@ fn process_network_incoming(
                     net_state.connected = true;
                     net_state.client_id = Some(client_id);
                     net_state.is_gm = is_gm;
-                    net_state.status = format!("Connected as {} (id={})",
-                        if is_gm { "GM" } else { "Player" }, client_id);
+                    net_state.status = format!(
+                        "Connected as {} (id={})",
+                        if is_gm { "GM" } else { "Player" },
+                        client_id
+                    );
                     info!("{}", net_state.status);
                 }
                 ClientIncoming::Disconnected { reason } => {
@@ -141,7 +148,9 @@ fn process_network_incoming(
                     net_state.status = format!("Disconnected: {}", reason);
                     info!("{}", net_state.status);
                 }
-                ClientIncoming::Message(ServerMessage::StateSnapshot { history: new_history }) => {
+                ClientIncoming::Message(ServerMessage::StateSnapshot {
+                    history: new_history,
+                }) => {
                     if let Some(ref mut state_res) = state {
                         state_res.history = new_history;
                         info!("Applied remote state snapshot");
