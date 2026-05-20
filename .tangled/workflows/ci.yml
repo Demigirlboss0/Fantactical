@@ -28,9 +28,15 @@ steps:
 
   - name: "Clippy lint"
     command: cargo clippy -- -D warnings
+    env:
+      WAYLAND_CLIENT_NO_PKG_CONFIG: "1"
 
   - name: "Run unit tests"
     command: cargo test --lib
+    env:
+      WAYLAND_CLIENT_NO_PKG_CONFIG: "1"
 
   - name: "Run integration tests"
     command: cargo test --test network_integration
+    env:
+      WAYLAND_CLIENT_NO_PKG_CONFIG: "1"
