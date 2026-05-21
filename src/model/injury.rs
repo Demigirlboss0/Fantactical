@@ -94,7 +94,7 @@ pub fn resolve_injury(
     if shock_penalty != 0 {
         modified.individual_modifiers.push(Modifier {
             label: format!("Shock (-{})", shock_penalty.abs()),
-            value: -shock_penalty,
+            value: shock_penalty,
             applies_to: ModifierTarget::SpecificActor(target_id),
         });
     }
@@ -824,8 +824,8 @@ mod tests {
             updated
                 .individual_modifiers
                 .iter()
-                .any(|m| m.label == "Shock (-4)"),
-            "Shock modifier should be pushed to actor's individual_modifiers"
+                .any(|m| m.label == "Shock (-4)" && m.value == -4),
+            "Shock modifier should be pushed to actor's individual_modifiers with value -4"
         );
     }
 

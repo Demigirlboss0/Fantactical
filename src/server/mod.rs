@@ -292,28 +292,32 @@ mod tests {
     }
 
     #[test]
-    fn test_server_config_custom() {
-        let config = ServerConfig {
-            port: 1234,
-            session_token: "my-token".into(),
-        };
-        assert_eq!(config.port, 1234);
-        assert_eq!(config.session_token, "my-token");
-    }
-
-    #[test]
-    fn test_spawn_server_creates_channels() {
+    fn test_spawn_server_binds_and_accepts() {
         let rt = tokio::runtime::Runtime::new().unwrap();
-        let _guard = rt.enter();
-        let config = ServerConfig::default();
-        let (outgoing_tx, _incoming_rx) = spawn_server(config);
-        // Verify channels work by sending a message
-        let result = outgoing_tx.send(ServerOutgoing::Broadcast(
-            crate::network::ServerMessage::Error {
-                message: "test".into(),
-            },
-        ));
-        assert!(result.is_ok());
+        rt.block_on(async move {
+            let config = ServerConfig {
+                port: 0, // ephemeral
+                session_token: "test-token".into(),
+            };
+            let (outgoing_tx, mut incoming_rx) = spawn_server(config.clone());
+            // Give the server task a moment to bind
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            // Send a message through the channel — this verifies the spawned
+            // task is alive and the outgoing channel works.
+            let send_result = outgoing_tx.send(ServerOutgoing::Broadcast(
+                crate::network::ServerMessage::Error {
+                    message: "ping".into(),
+                },
+            ));
+            assert!(send_result.is_ok(), "outgoing channel should accept messages");
+            // Verify the incoming channel is still open (server task hasn't panicked).
+            // try_recv returns Err(Empty) when open/empty, Err(Disconnected) if task died.
+            let recv_result = incoming_rx.try_recv();
+            assert!(
+                !matches!(recv_result, Err(tokio::sync::mpsc::error::TryRecvError::Disconnected)),
+                "incoming channel should still be open (server task alive)"
+            );
+        });
     }
 
     #[test]

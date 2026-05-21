@@ -157,44 +157,26 @@ mod tests {
     #[test]
     fn test_spawn_client_creates_channels() {
         let rt = tokio::runtime::Runtime::new().unwrap();
-        let _guard = rt.enter();
-        let (outgoing_tx, _incoming_rx) = spawn_client();
-        // Should be able to send a connect request
-        let result = outgoing_tx.send(ClientOutgoing::Connect {
-            host: "127.0.0.1".into(),
-            port: 9999,
-            token: "test".into(),
+        rt.block_on(async move {
+            let (outgoing_tx, mut incoming_rx) = spawn_client();
+            // Connect to a dead port — client should emit Status then Disconnected
+            let send_result = outgoing_tx.send(ClientOutgoing::Connect {
+                host: "127.0.0.1".into(),
+                port: 9999,
+                token: "test".into(),
+            });
+            assert!(send_result.is_ok(), "channel should accept connect request");
+            // Read the first incoming message — should be Status("Connecting to ...")
+            match incoming_rx.recv().await {
+                Some(msg) => {
+                    assert!(
+                        matches!(msg, ClientIncoming::Status(_) | ClientIncoming::Disconnected { .. }),
+                        "expected Status or Disconnected, got {:?}", msg
+                    );
+                }
+                None => panic!("incoming channel closed unexpectedly"),
+            }
         });
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_client_outgoing_variants() {
-        assert!(matches!(
-            ClientOutgoing::Send(ClientMessage::RollDice),
-            ClientOutgoing::Send(_)
-        ));
-        assert!(matches!(
-            ClientOutgoing::Disconnect,
-            ClientOutgoing::Disconnect
-        ));
-    }
-
-    #[test]
-    fn test_client_incoming_variants() {
-        let connected = ClientIncoming::Connected {
-            client_id: 1,
-            is_gm: true,
-        };
-        assert!(matches!(connected, ClientIncoming::Connected { .. }));
-
-        let disconnected = ClientIncoming::Disconnected {
-            reason: "timeout".into(),
-        };
-        assert!(matches!(disconnected, ClientIncoming::Disconnected { .. }));
-
-        let status = ClientIncoming::Status("reconnecting".into());
-        assert!(matches!(status, ClientIncoming::Status(_)));
     }
 
     #[test]
@@ -207,10 +189,19 @@ mod tests {
     #[test]
     fn test_disconnect_before_connect() {
         let rt = tokio::runtime::Runtime::new().unwrap();
-        let _guard = rt.enter();
-        let (outgoing_tx, _incoming_rx) = spawn_client();
-        // Disconnect should be fine even if not connected
-        let result = outgoing_tx.send(ClientOutgoing::Disconnect);
-        assert!(result.is_ok());
+        rt.block_on(async move {
+            let (outgoing_tx, _incoming_rx) = spawn_client();
+            // Send disconnect before any connect — the client task should handle it
+            let send_result = outgoing_tx.send(ClientOutgoing::Disconnect);
+            assert!(send_result.is_ok(), "channel should accept disconnect");
+            // The client task should survive a disconnect sent before connect.
+            // Verify by sending another message after a brief pause.
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            let second_send = outgoing_tx.send(ClientOutgoing::Disconnect);
+            assert!(
+                second_send.is_ok(),
+                "channel should still be open after pre-connect disconnect"
+            );
+        });
     }
 }

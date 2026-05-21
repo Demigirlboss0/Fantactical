@@ -171,7 +171,14 @@ mod tests {
     #[test]
     fn test_roll_damage() {
         let dmg = roll_damage(2, 1); // 2d6+1
-        assert!(dmg >= 3); // minimum 1+1+1=3
+        assert!(dmg >= 3 && dmg <= 13, "2d+1 should be in [3, 13], got {}", dmg);
+    }
+
+    #[test]
+    fn test_roll_damage_negative_adds_wraps_to_zero() {
+        // 1d-6: minimum possible is 1-6 = -5, but .max(0) should make it 0
+        let dmg = roll_damage(1, -6);
+        assert_eq!(dmg, 0, "1d-6 should be clamped to 0");
     }
 
     #[test]

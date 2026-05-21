@@ -1175,19 +1175,38 @@ mod tests {
 
     #[test]
     fn test_random_hit_location_table() {
+        // B552 humanoid table: test at least one roll per band
         assert_eq!(HitLocation::from_random_roll(3).0, HitLocation::Torso);
         assert_eq!(HitLocation::from_random_roll(4).0, HitLocation::Torso);
         assert_eq!(HitLocation::from_random_roll(5).0, HitLocation::RightArm);
+        assert_eq!(HitLocation::from_random_roll(6).0, HitLocation::RightArm);
+        assert_eq!(HitLocation::from_random_roll(7).0, HitLocation::Torso); // 7-10 band
+        assert_eq!(HitLocation::from_random_roll(10).0, HitLocation::Torso);
         assert_eq!(HitLocation::from_random_roll(11).0, HitLocation::Groin);
+        assert_eq!(HitLocation::from_random_roll(12).0, HitLocation::RightArm); // 12-13 band
+        assert_eq!(HitLocation::from_random_roll(14).0, HitLocation::RightLeg); // 14-15 band
+        assert_eq!(HitLocation::from_random_roll(15).0, HitLocation::RightLeg);
+        assert_eq!(HitLocation::from_random_roll(16).0, HitLocation::RightHand);
+        assert_eq!(HitLocation::from_random_roll(17).0, HitLocation::RightFoot);
         assert_eq!(HitLocation::from_random_roll(18).0, HitLocation::Neck);
+        // Out-of-bounds roll returns Torso
+        assert_eq!(HitLocation::from_random_roll(0).0, HitLocation::Torso);
+        assert_eq!(HitLocation::from_random_roll(19).0, HitLocation::Torso);
     }
 
     #[test]
     fn test_eye_illegal_damage_types() {
         assert!(!HitLocation::Eye.is_legal_target(DamageType::Crushing));
         assert!(!HitLocation::Eye.is_legal_target(DamageType::Cutting));
+        assert!(!HitLocation::Eye.is_legal_target(DamageType::Burning));
+        assert!(!HitLocation::Eye.is_legal_target(DamageType::Toxic));
+        assert!(!HitLocation::Eye.is_legal_target(DamageType::Corrosive));
+        assert!(!HitLocation::Eye.is_legal_target(DamageType::FatigueDmg));
         assert!(HitLocation::Eye.is_legal_target(DamageType::Impaling));
         assert!(HitLocation::Eye.is_legal_target(DamageType::Piercing));
+        assert!(HitLocation::Eye.is_legal_target(DamageType::SmallPiercing));
+        assert!(HitLocation::Eye.is_legal_target(DamageType::LargePiercing));
+        assert!(HitLocation::Eye.is_legal_target(DamageType::HugePiercing));
         assert!(HitLocation::Eye.is_legal_target(DamageType::TightBeamBurning));
     }
 
@@ -1368,7 +1387,8 @@ mod tests {
         };
         let mut state2 = state1.clone();
         state2.round = 2;
-        let state3 = state2.clone();
+        let mut state3 = state2.clone();
+        state3.round = 3; // distinct from state2 so rewind assertion is meaningful
 
         let mut history = GameStateHistory::new(state1);
         history.push(state2.clone());
@@ -1508,20 +1528,75 @@ mod tests {
 
     #[test]
     fn test_serde_roundtrip_game_state() {
+        let mut actors = HashMap::new();
+        actors.insert(
+            1,
+            Actor {
+                id: 1,
+                name: "Test".into(),
+                portrait_path: None,
+                portrait_data: None,
+                source_path: None,
+                is_npc: false,
+                st: 10,
+                dx: 10,
+                iq: 10,
+                ht: 10,
+                hp_max: 10,
+                fp_max: 10,
+                basic_speed: 6.0,
+                basic_move: 6,
+                will: 10,
+                per: 10,
+                attacks: vec![],
+                skills: vec![],
+                armor: vec![],
+                sm: 0,
+                is_male: true,
+                position: (0, 0),
+                hp_current: 10,
+                fp_current: 10,
+                posture: Posture::Standing,
+                encumbrance: Encumbrance::None,
+                flags: StatusFlags::default(),
+                leg_state: LegState::default(),
+                individual_modifiers: vec![],
+                pain_threshold: PainThreshold::Normal,
+                turns_per_round: 1,
+                attacks_per_turn: 1,
+                enhanced_time_sense: false,
+                current_maneuver: None,
+                active_attack: None,
+                extra_effort: vec![],
+            },
+        );
         let state = GameState {
-            actors: HashMap::new(),
+            actors,
             relations: vec![],
-            turn_order: vec![],
+            turn_order: vec![1],
             current_actor: 1,
             current_phase: TurnPhase::ManeuverSelection,
-            global_modifiers: vec![],
+            global_modifiers: vec![Modifier {
+                label: "Lighting: Dark (-4)".into(),
+                value: -4,
+                applies_to: ModifierTarget::AllRolls,
+            }],
             round: 1,
-            attacks_remaining: 1,
+            attacks_remaining: 2,
         };
         let json = serde_json::to_string(&state).unwrap();
         let decoded: GameState = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.round, 1);
-        assert_eq!(decoded.current_phase, TurnPhase::ManeuverSelection);
+        assert_eq!(decoded.round, state.round);
+        assert_eq!(decoded.current_actor, state.current_actor);
+        assert_eq!(decoded.current_phase, state.current_phase);
+        assert_eq!(decoded.turn_order, state.turn_order);
+        assert_eq!(decoded.attacks_remaining, state.attacks_remaining);
+        assert_eq!(decoded.global_modifiers.len(), state.global_modifiers.len());
+        assert_eq!(decoded.actors.len(), state.actors.len());
+        assert_eq!(
+            decoded.actors.get(&1).unwrap().name,
+            state.actors.get(&1).unwrap().name
+        );
     }
 
     #[test]

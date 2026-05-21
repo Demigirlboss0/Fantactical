@@ -359,10 +359,50 @@ mod tests {
         // Ensure all ClientMessage variants serialize/deserialize cleanly
         let messages = vec![
             ClientMessage::Auth { token: "x".into() },
+            ClientMessage::DeclareManeuver {
+                source_id: 1,
+                target_id: Some(2),
+                target_hex: None,
+                maneuver: ManeuverType::Attack,
+                extra_efforts: vec![],
+            },
+            ClientMessage::SelectDefense {
+                defender_id: 1,
+                defense_type: DefenseTypeWire::Dodge,
+            },
             ClientMessage::RollDice,
+            ClientMessage::AddModifier {
+                label: "Dark".into(),
+                value: -4,
+                actor_id: None,
+            },
+            ClientMessage::RemoveModifier {
+                index: 0,
+                actor_id: None,
+            },
             ClientMessage::Rewind,
+            ClientMessage::SetPainThreshold {
+                actor_id: 1,
+                threshold: PainThreshold::High,
+            },
+            ClientMessage::SetPosture {
+                actor_id: 1,
+                posture: Posture::Standing,
+            },
+            ClientMessage::MoveActor {
+                actor_id: 1,
+                position: (3, 5),
+            },
+            ClientMessage::ReorderTurnOrder {
+                from_index: 0,
+                to_index: 2,
+            },
             ClientMessage::ShockToggle { enabled: true },
+            ClientMessage::ImportSheet {
+                json_data: "{}".into(),
+            },
         ];
+        assert_eq!(messages.len(), 13, "all ClientMessage variants must be listed");
         for msg in &messages {
             let json = serde_json::to_string(msg).expect("serialize");
             assert!(!json.is_empty());
