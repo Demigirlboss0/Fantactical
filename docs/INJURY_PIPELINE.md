@@ -15,21 +15,36 @@ pub fn resolve_injury(
     damage_type: DamageType,
     crit_result: Option<CritHitResult>,
     shock_enabled: bool,
-) -> Result<(GameState, InjuryOutcome), String>
+) -> anyhow::Result<(GameState, InjuryOutcome)>
 ```
 
 Returns `InjuryOutcome`:
 ```rust
 pub struct InjuryOutcome {
-    pub effective_dr: u8,
-    pub penetrating_damage: u32,
-    pub wounding_multiplier: f32,
+    pub target_id: ActorId,
+    pub hit_location: HitLocation,
     pub raw_injury: u32,
-    pub hp_lost: u16,
+    pub effective_dr: u8,
+    pub wounding_multiplier: f32,
+    pub rolled_damage: u32,
+    pub damage_type: DamageType,
     pub major_wound: bool,
     pub knockdown: bool,
+    pub stunned: bool,
+    pub limb_crippled: Vec<LimbCrippleInfo>,
+    pub hp_lost: u32,
+    pub shock_penalty: i8,
+    pub consciousness_roll_needed: bool,
+    pub consciousness_penalty: i8,
     pub knockdown_modifier: i8,
     pub dead: bool,
+}
+```
+
+`LimbCrippleInfo`:
+```rust
+pub struct LimbCrippleInfo {
+    pub location: HitLocation,
 }
 ```
 
@@ -97,11 +112,11 @@ raw_injury = penetrating_damage * wounding_multiplier(location, damage_type)
 | Face | ×1.5 | ×1.5 | ×2 | ×1 | ×0.5 | ×1.5 | ×2 | ×1 | ×1 |
 | Eye | — | — | ×4 | ×4 | ×4 | ×4 | ×4 | ×4 | — |
 | Neck | ×1.5 | ×2 | ×2 | ×1 | ×0.5 | ×1.5 | ×2 | ×2 | ×1 |
-| Vitals | ×1 | — | ×3 | ×3 | ×3 | ×3 | ×3 | ×3 | — |
+| Vitals | ×1 | ×1.5 | ×3 | ×3 | ×3 | ×3 | ×3 | ×3 | — |
 | Groin | ×1 | ×1.5 | ×2 | ×1 | ×0.5 | ×1.5 | ×2 | ×1 | ×1 |
 | Limbs | ×1 | ×1.5 | ×1 | ×1 | ×0.5 | ×1 | ×1 | ×1 | ×1 |
 | NeckVascular | ×1.5 | ×2 | ×2 | ×1.5 | ×1 | ×2 | ×2.5 | ×1.5 | — |
-| Heart | ×1 | — | ×3 | ×3 | ×3 | ×3 | ×3 | ×3 | — |
+| Heart | ×1 | ×1.5 | ×3 | ×3 | ×3 | ×3 | ×3 | ×3 | — |
 
 (Full table at `src/model/mod.rs:255`)
 

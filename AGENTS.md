@@ -109,6 +109,7 @@ pub struct GameState {
     pub current_phase: TurnPhase,
     pub global_modifiers: Vec<Modifier>,
     pub round: u32,
+    pub attacks_remaining: u8,          // per-turn extra attack tracking
 }
 
 // The event log is explicitly NOT part of GameState.
@@ -128,6 +129,9 @@ pub struct LogEntry {
 }
 
 pub enum LogEntryKind {
+    Info,
+    Warning,
+    Error,
     ManeuverDeclared,
     RollResult,
     ModifierApplied,
@@ -140,6 +144,8 @@ pub struct Actor {
     pub id: ActorId,
     pub name: String,
     pub portrait_path: Option<String>,
+    pub portrait_data: Option<Vec<u8>>,
+    pub source_path: Option<String>,
     pub is_npc: bool,
 
     // GCS-imported stats
@@ -150,6 +156,9 @@ pub struct Actor {
     pub attacks: Vec<Attack>,
     pub skills: Vec<Skill>,
     pub armor: Vec<ArmorPiece>,
+    pub sm: i8,
+    pub is_male: bool,
+    pub position: (i32, i32),
 
     // Live state
     pub hp_current: i16,
@@ -217,8 +226,8 @@ pub struct Attack {
     pub rcl: Option<u8>,            // ranged only
 }
 
-pub enum DamageType { Crushing, Cutting, Impaling, Piercing, LargePiercing,
-                      HugePiercing, Burning, Toxic, Corrosive, FatigueDmg }
+pub enum DamageType { Crushing, Cutting, Impaling, Piercing, SmallPiercing, LargePiercing,
+                      HugePiercing, Burning, Toxic, Corrosive, FatigueDmg, TightBeamBurning }
 
 pub struct ArmorPiece {
     pub name: String,
@@ -290,6 +299,10 @@ Specific targeted locations and their to-hit penalties:
 - Neck Vascular: -8
 - Arm/Leg Joint: -5
 - Hand/Foot Joint: -7
+
+Note: `to_hit_penalty()` returns front-arc penalties only.
+Front/back arc distinction (e.g. Skull -7/-5) is spec but not yet wired
+into hit location selection.
 
 ### Maneuver relations
 
@@ -436,7 +449,7 @@ TurnPhase::ManeuverSelection
   - Compute available_maneuvers(actor) → render tray
   - Player drags card(s) onto own token or target token
   - Validate combo whitelist
-  - If non-offensive → TurnPhase::NonCombatResolution
+  - If non-offensive → TurnPhase::Complete
   - If offensive → TurnPhase::AttackSetup
 
 TurnPhase::AttackSetup
@@ -670,6 +683,8 @@ Changes to settings do not push a `GameState` snapshot.
 pub struct AppSettings {
     pub shock_enabled: bool,        // default: true; global toggle
     pub theme: String,              // theme identifier, default: "mil-sim"
+    pub event_log_height: f32,      // configurable panel height
+    pub maneuver_tray_height: f32,  // configurable panel height
 }
 ```
 
@@ -710,32 +725,32 @@ pub trait Theme {
 }
 
 pub struct ThemeColors {
-    pub background: Color,
-    pub panel_surface: Color,
-    pub panel_border: Color,
-    pub text_primary: Color,
-    pub text_secondary: Color,
-    pub accent: Color,
-    pub danger: Color,
-    pub warning: Color,
-    pub success: Color,
+    pub background: Srgba,
+    pub panel_surface: Srgba,
+    pub panel_border: Srgba,
+    pub text_primary: Srgba,
+    pub text_secondary: Srgba,
+    pub accent: Srgba,
+    pub danger: Srgba,
+    pub warning: Srgba,
+    pub success: Srgba,
     // Maneuver category colors
-    pub maneuver_offensive_defended: Color,
-    pub maneuver_offensive_undefended: Color,
-    pub maneuver_setup: Color,
-    pub maneuver_defensive: Color,
-    pub maneuver_mental: Color,
+    pub maneuver_offensive_defended: Srgba,
+    pub maneuver_offensive_undefended: Srgba,
+    pub maneuver_setup: Srgba,
+    pub maneuver_defensive: Srgba,
+    pub maneuver_mental: Srgba,
     // HP/FP bar thresholds
-    pub bar_healthy: Color,
-    pub bar_low: Color,
-    pub bar_critical: Color,
-    pub bar_dead: Color,
+    pub bar_healthy: Srgba,
+    pub bar_low: Srgba,
+    pub bar_critical: Srgba,
+    pub bar_dead: Srgba,
     // Encumbrance tints
-    pub enc_none: Color,
-    pub enc_light: Color,
-    pub enc_medium: Color,
-    pub enc_heavy: Color,
-    pub enc_extra: Color,
+    pub enc_none: Srgba,
+    pub enc_light: Srgba,
+    pub enc_medium: Srgba,
+    pub enc_heavy: Srgba,
+    pub enc_extra: Srgba,
 }
 
 pub struct ThemeTypography {
@@ -793,9 +808,9 @@ restrictions beyond making the resources available.
 
 - Grid only. No image import.
 - Each cell = 1 yard. Scale is configurable (pixels per yard).
-- Tokens are circles with portrait texture (or colored circle fallback).
+- Tokens are flat-top hex sprites with portrait texture (or colored hex fallback).
 - Token position stored as `(i32, i32)` grid coordinates on `Actor`.
-- Range between two tokens = Chebyshev distance (GURPS uses facing-free range).
+- Range between two tokens = hex distance.
 
 ### Maneuver relation arrows
 Rendered as directional arrows from source token to target token.
@@ -870,7 +885,9 @@ skills (name, level), equipment with DR by location.
 Weapons are extracted from both `traits[*].weapons` (natural attacks) and
 `equipment[*].weapons` (equipped items), including recursive container children.
 
-On import, portrait image path is set if GCS file references one.
+On import, portrait image path is set if GCS file references one. Base64-encoded
+portrait data from GCS sheets is decoded and stored as `portrait_data` for
+immediate rendering as an egui texture.
 
 ---
 
@@ -978,7 +995,7 @@ Success:          #44AA44
 
 No rounded corners on panels — hard edges. Subtle scanline or noise texture on
 battlemap background is acceptable. Token circles may have slight drop shadow.
-Maneuver cards have a 3px color band on the left edge (category color) and are
+Maneuver cards have a 5px color band on the left edge (category color) and are
 otherwise dark surface.
 
 ---
@@ -1055,12 +1072,12 @@ clients on connect. No user accounts.
 6. `src/state/history.rs` — GameStateHistory, push/rewind
 7. `src/settings.rs` — AppSettings resource, Theme trait, mil-sim default theme
 8. `src/server/` — WebSocket server, session auth, broadcast
-9. `src/client/network.rs` — WebSocket client, reconnect logic
+9. `src/client/` — WebSocket client, reconnect logic (in `mod.rs`)
 10. `src/ui/battlemap.rs` — Bevy viewport, grid, token rendering, arrows
-11. `src/ui/character_panel.rs` — compact stat blocks, drag to reorder
-12. `src/ui/card_tray.rs` — maneuver cards, drag-drop onto tokens
-13. `src/ui/event_log.rs` — console panel
-14. `src/ui/gm_panel.rs` — modifier config, rewind, shock toggle, pain threshold toggles
+11. `src/ui/panels.rs` — compact stat blocks, drag to reorder, maneuver cards, event log, GM config
+12. (merged into panels.rs)
+13. (merged into panels.rs)
+14. (merged into panels.rs)
 15. `src/ui/roll_modal.rs` — overlay prompts anchored to tokens
 16. Integration: wire all events through state machine phase transitions
 

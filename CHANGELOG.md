@@ -36,6 +36,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bevy ECS scaffolding with resources, plugins, systems (#1–#6)
 
 ### Fixed
+- Fix AGENTS.md stale field definitions (GameState, Actor, DamageType, LogEntryKind) (#69)
 - Fix all clippy warnings so -D warnings passes clean (#67)
 - Seed RNG with hashed system time to eliminate determinism (#62)
 - Add dice roll results to event log for attack, defense, and damage rolls (#61)
@@ -58,3 +59,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - HP current now reads `calc/current` from GCS instead of defaulting to max (#6)
 
 ### Changed
+- Fix INJURY_PIPELINE.md wounding multiplier table (Vitals+Cut, Heart+Cut entries) (#73)
+- Fix DATA_MODEL.md: HitLocation count (27 not 28), InjuryOutcome fields, resolve_injury return type (#72)
+- Fix AGENTS.md theme/types: AppSettings fields, ThemeColors type (Srgba), portrait data, card border size (#71)
+- Fix AGENTS.md flow, file references, and rendering descriptions (NonCombatResolution path, Chebyshev→hex_distance, circles→hex sprites, file names) (#70)

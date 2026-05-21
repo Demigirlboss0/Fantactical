@@ -141,7 +141,7 @@ turns; transient ones are cleared on Complete.
 
 ## HitLocation
 
-`src/model/mod.rs:57` — 28 variants covering the full extended humanoid table:
+`src/model/mod.rs:57` — 27 variants covering the full extended humanoid table:
 
 | Region | Locations |
 |--------|-----------|
